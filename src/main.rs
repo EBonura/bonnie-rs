@@ -73,6 +73,8 @@ async fn main() {
 
     loop {
         // Handle input
+        // ESC only quits on native, not web (breaks WASM)
+        #[cfg(not(target_arch = "wasm32"))]
         if is_key_pressed(KeyCode::Escape) {
             break;
         }
