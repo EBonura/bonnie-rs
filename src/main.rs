@@ -5,14 +5,17 @@
 //! - Vertex snapping (jittery vertices)
 //! - Gouraud shading
 //! - Low resolution (320x240)
+//! - TR1-style room-based levels with portal culling
 
 mod rasterizer;
+mod world;
 
 use macroquad::prelude::*;
 use rasterizer::{
     Camera, Color, Framebuffer, RasterSettings, ShadingMode, Texture,
-    create_test_cube, render_mesh, HEIGHT, WIDTH,
+    render_mesh, HEIGHT, WIDTH,
 };
+use world::{Level, create_test_level, load_level};
 
 /// Convert our framebuffer to a macroquad texture
 fn framebuffer_to_texture(fb: &Framebuffer) -> Texture2D {
@@ -31,49 +34,75 @@ fn window_conf() -> Conf {
     }
 }
 
+/// Render all rooms in a level
+fn render_level(
+    fb: &mut Framebuffer,
+    level: &Level,
+    textures: &[Texture],
+    camera: &Camera,
+    settings: &RasterSettings,
+) {
+    for room in &level.rooms {
+        let (vertices, faces) = room.to_render_data();
+        render_mesh(fb, &vertices, &faces, textures, camera, settings);
+    }
+}
+
 #[macroquad::main(window_conf)]
 async fn main() {
     // Initialize framebuffer
     let mut fb = Framebuffer::new(WIDTH, HEIGHT);
 
-    // Initialize camera
+    // Initialize camera - position inside first room
     let mut camera = Camera::new();
-    camera.position = rasterizer::Vec3::new(0.0, 0.0, -5.0);
+    camera.position = rasterizer::Vec3::new(0.0, 1.5, 0.0);
 
-    // Create test cube
-    let (vertices, faces) = create_test_cube();
+    // Load level from file, fall back to hardcoded test level
+    let level = match load_level("assets/levels/test.ron") {
+        Ok(l) => {
+            println!("Loaded level from assets/levels/test.ron");
+            l
+        }
+        Err(e) => {
+            println!("Failed to load level: {}, using hardcoded test level", e);
+            create_test_level()
+        }
+    };
 
-    // Create test texture (checkerboard)
+    // Create textures for each room
     let textures = vec![
+        // Texture 0: Orange/blue checkerboard (room 0)
         Texture::checkerboard(32, 32, Color::new(200, 100, 50), Color::new(50, 100, 200)),
+        // Texture 1: Green/purple checkerboard (room 1)
+        Texture::checkerboard(32, 32, Color::new(50, 200, 100), Color::new(150, 50, 200)),
     ];
 
     // Rasterizer settings
     let mut settings = RasterSettings::default();
 
-    // Rotation for the cube
-    let mut rotation = 0.0f32;
-
     // Mouse state for camera control
     let mut last_mouse_pos = mouse_position();
     let mut mouse_captured = false;
+
+    // Track which room camera is in
+    let mut current_room: Option<usize> = Some(0);
 
     println!("=== bonnie-rs ===");
     println!("Controls:");
     println!("  Right-click + drag: Look around");
     println!("  WASD: Move camera");
+    println!("  Q/E: Move up/down");
     println!("  1/2/3: Shading mode (None/Flat/Gouraud)");
     println!("  P: Toggle perspective correction");
     println!("  J: Toggle vertex jitter");
     println!("  Z: Toggle Z-buffer");
-    println!("  Space: Pause rotation");
-    println!("  ESC: Quit");
-
-    let mut paused = false;
+    println!("  ESC: Quit (native only)");
+    println!();
+    println!("Level: 2 connected rooms");
+    println!("Walk through the portal on the +Z wall to enter room 2!");
 
     loop {
         // Handle input
-        // ESC only quits on native, not web (breaks WASM)
         #[cfg(not(target_arch = "wasm32"))]
         if is_key_pressed(KeyCode::Escape) {
             break;
@@ -113,16 +142,13 @@ async fn main() {
                 if settings.use_zbuffer { "ON" } else { "OFF (painter's)" }
             );
         }
-        if is_key_pressed(KeyCode::Space) {
-            paused = !paused;
-            println!("Rotation: {}", if paused { "PAUSED" } else { "RUNNING" });
-        }
 
         // Camera rotation with right mouse button
         let mouse_pos = mouse_position();
         if is_mouse_button_down(MouseButton::Right) {
             if mouse_captured {
-                let dx = (mouse_pos.1 - last_mouse_pos.1) * 0.005;
+                // Note: negated dx for non-inverted vertical look
+                let dx = -(mouse_pos.1 - last_mouse_pos.1) * 0.005;
                 let dy = (mouse_pos.0 - last_mouse_pos.0) * 0.005;
                 camera.rotate(dx, dy);
             }
@@ -132,8 +158,8 @@ async fn main() {
         }
         last_mouse_pos = mouse_pos;
 
-        // Camera movement (WASD)
-        let move_speed = 0.1;
+        // Camera movement (WASD + Q/E for vertical)
+        let move_speed = 0.05;
         if is_key_down(KeyCode::W) {
             camera.position = camera.position + camera.basis_z * move_speed;
         }
@@ -146,39 +172,27 @@ async fn main() {
         if is_key_down(KeyCode::D) {
             camera.position = camera.position + camera.basis_x * move_speed;
         }
-
-        // Update rotation
-        if !paused {
-            rotation += 0.02;
+        if is_key_down(KeyCode::Q) {
+            camera.position = camera.position - camera.basis_y * move_speed;
+        }
+        if is_key_down(KeyCode::E) {
+            camera.position = camera.position + camera.basis_y * move_speed;
         }
 
-        // Transform vertices for rotation (rotate around Y axis)
-        let cos_r = rotation.cos();
-        let sin_r = rotation.sin();
-        let rotated_vertices: Vec<_> = vertices
-            .iter()
-            .map(|v| {
-                let mut rv = *v;
-                rv.pos = rasterizer::Vec3::new(
-                    v.pos.x * cos_r - v.pos.z * sin_r,
-                    v.pos.y,
-                    v.pos.x * sin_r + v.pos.z * cos_r,
-                );
-                // Also rotate normal
-                rv.normal = rasterizer::Vec3::new(
-                    v.normal.x * cos_r - v.normal.z * sin_r,
-                    v.normal.y,
-                    v.normal.x * sin_r + v.normal.z * cos_r,
-                );
-                rv
-            })
-            .collect();
+        // Update current room (with hint for faster lookup)
+        let new_room = level.find_room_at_with_hint(camera.position, current_room);
+        if new_room != current_room {
+            if let Some(room_id) = new_room {
+                println!("Entered room {}", room_id);
+            }
+            current_room = new_room;
+        }
 
         // Clear framebuffer
         fb.clear(Color::new(20, 20, 30));
 
-        // Render the cube
-        render_mesh(&mut fb, &rotated_vertices, &faces, &textures, &camera, &settings);
+        // Render the level (all rooms for now - portal culling comes later)
+        render_level(&mut fb, &level, &textures, &camera, &settings);
 
         // Convert framebuffer to macroquad texture
         let texture = framebuffer_to_texture(&fb);
@@ -206,8 +220,17 @@ async fn main() {
             },
         );
 
-        // Draw FPS
+        // Draw HUD
+        let room_text = match current_room {
+            Some(id) => format!("Room: {}", id),
+            None => "Room: outside".to_string(),
+        };
         draw_text(&format!("FPS: {}", get_fps()), 10.0, 20.0, 20.0, WHITE);
+        draw_text(&room_text, 10.0, 40.0, 20.0, WHITE);
+        draw_text(
+            &format!("Pos: ({:.1}, {:.1}, {:.1})", camera.position.x, camera.position.y, camera.position.z),
+            10.0, 60.0, 20.0, WHITE
+        );
 
         next_frame().await;
     }

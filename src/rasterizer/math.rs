@@ -2,9 +2,10 @@
 //! Ported from tipsy's C implementation
 
 use std::ops::{Add, Sub, Mul};
+use serde::{Serialize, Deserialize};
 
 /// 3D Vector
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub struct Vec3 {
     pub x: f32,
     pub y: f32,
@@ -86,7 +87,7 @@ impl Mul<f32> for Vec3 {
 }
 
 /// 2D Vector (for texture coordinates)
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub struct Vec2 {
     pub x: f32,
     pub y: f32,

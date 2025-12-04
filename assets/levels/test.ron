@@ -1,0 +1,134 @@
+// Test level with two connected rooms
+(
+  rooms: [
+    // Room 0: Main room (4x3x4 units)
+    (
+      id: 0,
+      position: (x: 0.0, y: 0.0, z: 0.0),
+      vertices: [
+        // Floor corners (y = 0)
+        (x: -2.0, y: 0.0, z: -2.0),  // 0
+        (x: 2.0, y: 0.0, z: -2.0),   // 1
+        (x: 2.0, y: 0.0, z: 2.0),    // 2
+        (x: -2.0, y: 0.0, z: 2.0),   // 3
+        // Ceiling corners (y = 3)
+        (x: -2.0, y: 3.0, z: -2.0),  // 4
+        (x: 2.0, y: 3.0, z: -2.0),   // 5
+        (x: 2.0, y: 3.0, z: 2.0),    // 6
+        (x: -2.0, y: 3.0, z: 2.0),   // 7
+        // Portal wall vertices (front wall +Z, with opening)
+        // Left section
+        (x: -2.0, y: 0.0, z: 2.0),   // 8  (same as 3)
+        (x: -0.8, y: 0.0, z: 2.0),   // 9
+        (x: -0.8, y: 2.5, z: 2.0),   // 10
+        (x: -2.0, y: 2.5, z: 2.0),   // 11
+        // Right section
+        (x: 0.8, y: 0.0, z: 2.0),    // 12
+        (x: 2.0, y: 0.0, z: 2.0),    // 13 (same as 2)
+        (x: 2.0, y: 2.5, z: 2.0),    // 14
+        (x: 0.8, y: 2.5, z: 2.0),    // 15
+        // Top section (above portal)
+        (x: -2.0, y: 2.5, z: 2.0),   // 16
+        (x: 2.0, y: 2.5, z: 2.0),    // 17
+        (x: 2.0, y: 3.0, z: 2.0),    // 18
+        (x: -2.0, y: 3.0, z: 2.0),   // 19
+      ],
+      faces: [
+        // Floor
+        (indices: [0, 1, 2, 3], is_triangle: false, texture_id: 0, double_sided: false),
+        // Ceiling
+        (indices: [7, 6, 5, 4], is_triangle: false, texture_id: 0, double_sided: false),
+        // Back wall (-Z)
+        (indices: [0, 4, 5, 1], is_triangle: false, texture_id: 0, double_sided: false),
+        // Left wall (-X)
+        (indices: [3, 7, 4, 0], is_triangle: false, texture_id: 0, double_sided: false),
+        // Right wall (+X)
+        (indices: [1, 5, 6, 2], is_triangle: false, texture_id: 0, double_sided: false),
+        // Front wall sections (+Z with portal opening)
+        // Left section
+        (indices: [8, 9, 10, 11], is_triangle: false, texture_id: 0, double_sided: false),
+        // Right section
+        (indices: [12, 13, 14, 15], is_triangle: false, texture_id: 0, double_sided: false),
+        // Top section
+        (indices: [16, 17, 18, 19], is_triangle: false, texture_id: 0, double_sided: false),
+      ],
+      portals: [
+        (
+          target_room: 1,
+          vertices: [
+            (x: -0.8, y: 0.0, z: 2.0),
+            (x: 0.8, y: 0.0, z: 2.0),
+            (x: 0.8, y: 2.5, z: 2.0),
+            (x: -0.8, y: 2.5, z: 2.0),
+          ],
+          normal: (x: 0.0, y: 0.0, z: 1.0),
+        ),
+      ],
+    ),
+
+    // Room 1: Connected room (offset on +Z)
+    (
+      id: 1,
+      position: (x: 0.0, y: 0.0, z: 4.0),
+      vertices: [
+        // Floor corners
+        (x: -2.0, y: 0.0, z: 0.0),   // 0
+        (x: 2.0, y: 0.0, z: 0.0),    // 1
+        (x: 2.0, y: 0.0, z: 3.0),    // 2
+        (x: -2.0, y: 0.0, z: 3.0),   // 3
+        // Ceiling corners
+        (x: -2.0, y: 3.0, z: 0.0),   // 4
+        (x: 2.0, y: 3.0, z: 0.0),    // 5
+        (x: 2.0, y: 3.0, z: 3.0),    // 6
+        (x: -2.0, y: 3.0, z: 3.0),   // 7
+        // Portal wall vertices (back wall -Z, with opening)
+        // Left section
+        (x: -2.0, y: 0.0, z: 0.0),   // 8
+        (x: -0.8, y: 0.0, z: 0.0),   // 9
+        (x: -0.8, y: 2.5, z: 0.0),   // 10
+        (x: -2.0, y: 2.5, z: 0.0),   // 11
+        // Right section
+        (x: 0.8, y: 0.0, z: 0.0),    // 12
+        (x: 2.0, y: 0.0, z: 0.0),    // 13
+        (x: 2.0, y: 2.5, z: 0.0),    // 14
+        (x: 0.8, y: 2.5, z: 0.0),    // 15
+        // Top section
+        (x: -2.0, y: 2.5, z: 0.0),   // 16
+        (x: 2.0, y: 2.5, z: 0.0),    // 17
+        (x: 2.0, y: 3.0, z: 0.0),    // 18
+        (x: -2.0, y: 3.0, z: 0.0),   // 19
+      ],
+      faces: [
+        // Floor (different texture)
+        (indices: [0, 1, 2, 3], is_triangle: false, texture_id: 1, double_sided: false),
+        // Ceiling
+        (indices: [7, 6, 5, 4], is_triangle: false, texture_id: 1, double_sided: false),
+        // Back wall sections (-Z with portal opening) - reversed winding
+        // Left section
+        (indices: [11, 10, 9, 8], is_triangle: false, texture_id: 1, double_sided: false),
+        // Right section
+        (indices: [15, 14, 13, 12], is_triangle: false, texture_id: 1, double_sided: false),
+        // Top section
+        (indices: [19, 18, 17, 16], is_triangle: false, texture_id: 1, double_sided: false),
+        // Left wall
+        (indices: [0, 4, 7, 3], is_triangle: false, texture_id: 1, double_sided: false),
+        // Right wall
+        (indices: [2, 6, 5, 1], is_triangle: false, texture_id: 1, double_sided: false),
+        // Far wall (+Z)
+        (indices: [3, 7, 6, 2], is_triangle: false, texture_id: 1, double_sided: false),
+      ],
+      portals: [
+        (
+          target_room: 0,
+          vertices: [
+            (x: 0.8, y: 0.0, z: 0.0),
+            (x: -0.8, y: 0.0, z: 0.0),
+            (x: -0.8, y: 2.5, z: 0.0),
+            (x: 0.8, y: 2.5, z: 0.0),
+          ],
+          normal: (x: 0.0, y: 0.0, z: -1.0),
+        ),
+      ],
+    ),
+  ],
+)
