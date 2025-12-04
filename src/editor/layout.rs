@@ -9,10 +9,15 @@ use super::viewport_3d::draw_viewport_3d;
 use super::texture_palette::draw_texture_palette;
 
 /// Actions that can be triggered by the editor UI
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum EditorAction {
     None,
     Play,
+    New,
+    Save,
+    SaveAs,
+    Load(String), // Path to load
+    PromptLoad,   // Show file prompt
 }
 
 /// Editor layout state (split panel ratios)
@@ -105,31 +110,30 @@ pub fn draw_editor(
 }
 
 fn draw_menu_bar(ctx: &mut UiContext, rect: Rect, state: &mut EditorState) -> EditorAction {
+    use macroquad::prelude::*;
+
     draw_rectangle(rect.x, rect.y, rect.w, rect.h, Color::from_rgba(45, 45, 50, 255));
 
     let mut action = EditorAction::None;
     let mut toolbar = Toolbar::new(rect);
 
-    if toolbar.button(ctx, "File", 40.0) {
-        // TODO: File menu dropdown
+    // File operations
+    if toolbar.button(ctx, "New", 35.0) {
+        action = EditorAction::New;
     }
-    if toolbar.button(ctx, "Edit", 40.0) {
-        // TODO: Edit menu dropdown
+    if toolbar.button(ctx, "Open", 40.0) {
+        action = EditorAction::PromptLoad;
     }
-    if toolbar.button(ctx, "Room", 45.0) {
-        // TODO: Room menu dropdown
+    if toolbar.button(ctx, "Save", 40.0) {
+        action = EditorAction::Save;
     }
-    if toolbar.button(ctx, "View", 40.0) {
-        // TODO: View menu dropdown
+    if toolbar.button(ctx, "Save As", 55.0) {
+        action = EditorAction::SaveAs;
     }
 
     toolbar.separator();
 
-    // Quick actions
-    if toolbar.button(ctx, "Save", 40.0) {
-        // TODO: Save level
-        println!("Save clicked");
-    }
+    // Edit operations
     if toolbar.button(ctx, "Undo", 40.0) {
         state.undo();
     }
@@ -139,10 +143,57 @@ fn draw_menu_bar(ctx: &mut UiContext, rect: Rect, state: &mut EditorState) -> Ed
 
     toolbar.separator();
 
-    // Play button (green highlight)
+    // Play button
     if toolbar.button(ctx, "Play", 50.0) {
         action = EditorAction::Play;
     }
+
+    // Check keyboard shortcuts (Ctrl/Cmd + key)
+    let ctrl = is_key_down(KeyCode::LeftControl) || is_key_down(KeyCode::RightControl)
+             || is_key_down(KeyCode::LeftSuper) || is_key_down(KeyCode::RightSuper);
+    let shift = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
+
+    if ctrl && is_key_pressed(KeyCode::N) {
+        action = EditorAction::New;
+    }
+    if ctrl && is_key_pressed(KeyCode::O) {
+        action = EditorAction::PromptLoad;
+    }
+    if ctrl && shift && is_key_pressed(KeyCode::S) {
+        action = EditorAction::SaveAs;
+    } else if ctrl && is_key_pressed(KeyCode::S) {
+        action = EditorAction::Save;
+    }
+    if ctrl && is_key_pressed(KeyCode::Z) {
+        if shift {
+            state.redo();
+        } else {
+            state.undo();
+        }
+    }
+
+    // Show current file in menu bar
+    toolbar.separator();
+    let file_label = match &state.current_file {
+        Some(path) => {
+            let name = path.file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| "untitled".to_string());
+            if state.dirty {
+                format!("{}*", name)
+            } else {
+                name
+            }
+        }
+        None => {
+            if state.dirty {
+                "untitled*".to_string()
+            } else {
+                "untitled".to_string()
+            }
+        }
+    };
+    toolbar.label(&file_label);
 
     action
 }
@@ -294,13 +345,29 @@ fn draw_properties(ctx: &mut UiContext, rect: Rect, state: &mut EditorState) {
 fn draw_status_bar(rect: Rect, state: &EditorState) {
     draw_rectangle(rect.x, rect.y, rect.w, rect.h, Color::from_rgba(40, 40, 45, 255));
 
-    let status = format!(
-        "Room: {} | Tool: {:?} | Zoom: {:.1}x | {}",
-        state.current_room,
-        state.tool,
-        state.grid_zoom / 20.0,
-        if state.dirty { "Modified" } else { "Saved" }
-    );
+    // Show status message if available, otherwise show default status
+    let status = if let Some(msg) = state.get_status() {
+        msg.to_string()
+    } else {
+        format!(
+            "Room: {} | Tool: {:?} | Zoom: {:.1}x | {}",
+            state.current_room,
+            state.tool,
+            state.grid_zoom / 20.0,
+            if state.dirty { "Modified" } else { "Saved" }
+        )
+    };
 
     draw_text(&status, rect.x + 8.0, rect.y + 15.0, 14.0, WHITE);
+
+    // Show keyboard shortcuts hint on the right
+    let hints = "Ctrl+S: Save | Ctrl+Shift+S: Save As | Ctrl+O: Open | Ctrl+N: New";
+    let hint_width = hints.len() as f32 * 6.0; // Approximate width
+    draw_text(
+        hints,
+        rect.right() - hint_width - 8.0,
+        rect.y + 15.0,
+        12.0,
+        Color::from_rgba(100, 100, 100, 255),
+    );
 }

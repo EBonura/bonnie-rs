@@ -1,5 +1,6 @@
 //! Editor state and data
 
+use std::path::PathBuf;
 use crate::world::Level;
 use crate::rasterizer::{Camera, Vec3};
 
@@ -28,6 +29,9 @@ pub enum Selection {
 pub struct EditorState {
     /// The level being edited
     pub level: Level,
+
+    /// Current file path (None = unsaved new file)
+    pub current_file: Option<PathBuf>,
 
     /// Current tool
     pub tool: EditorTool,
@@ -60,6 +64,9 @@ pub struct EditorState {
     /// Dirty flag (unsaved changes)
     pub dirty: bool,
 
+    /// Status message (shown in status bar)
+    pub status_message: Option<(String, f64)>, // (message, expiry_time)
+
     /// 3D viewport mouse state (for camera control)
     pub viewport_last_mouse: (f32, f32),
     pub viewport_mouse_captured: bool,
@@ -78,6 +85,7 @@ impl EditorState {
 
         Self {
             level,
+            current_file: None,
             tool: EditorTool::Select,
             selection: Selection::None,
             current_room: 0,
@@ -91,6 +99,7 @@ impl EditorState {
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
             dirty: false,
+            status_message: None,
             viewport_last_mouse: (0.0, 0.0),
             viewport_mouse_captured: false,
             grid_last_mouse: (0.0, 0.0),
@@ -98,6 +107,29 @@ impl EditorState {
             grid_dragging_vertex: None,
             grid_drag_started: false,
         }
+    }
+
+    /// Create editor state with a file path
+    pub fn with_file(level: Level, path: PathBuf) -> Self {
+        let mut state = Self::new(level);
+        state.current_file = Some(path);
+        state
+    }
+
+    /// Set a status message that will be displayed for a duration
+    pub fn set_status(&mut self, message: &str, duration_secs: f64) {
+        let expiry = macroquad::time::get_time() + duration_secs;
+        self.status_message = Some((message.to_string(), expiry));
+    }
+
+    /// Get current status message if not expired
+    pub fn get_status(&self) -> Option<&str> {
+        if let Some((msg, expiry)) = &self.status_message {
+            if macroquad::time::get_time() < *expiry {
+                return Some(msg);
+            }
+        }
+        None
     }
 
     /// Save current state for undo

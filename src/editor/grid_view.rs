@@ -4,6 +4,19 @@ use macroquad::prelude::*;
 use crate::ui::{Rect, UiContext};
 use super::{EditorState, Selection};
 
+/// Point-in-triangle test using barycentric coordinates
+fn point_in_triangle(px: f32, py: f32, v0: (f32, f32), v1: (f32, f32), v2: (f32, f32)) -> bool {
+    let area = 0.5 * (-v1.1 * v2.0 + v0.1 * (-v1.0 + v2.0) + v0.0 * (v1.1 - v2.1) + v1.0 * v2.1);
+    let s = (v0.1 * v2.0 - v0.0 * v2.1 + (v2.1 - v0.1) * px + (v0.0 - v2.0) * py) / (2.0 * area);
+    let t = (v0.0 * v1.1 - v0.1 * v1.0 + (v0.1 - v1.1) * px + (v1.0 - v0.0) * py) / (2.0 * area);
+    s >= 0.0 && t >= 0.0 && (1.0 - s - t) >= 0.0
+}
+
+/// Point-in-quad test (two triangles)
+fn point_in_quad(px: f32, py: f32, v0: (f32, f32), v1: (f32, f32), v2: (f32, f32), v3: (f32, f32)) -> bool {
+    point_in_triangle(px, py, v0, v1, v2) || point_in_triangle(px, py, v0, v2, v3)
+}
+
 /// Draw the 2D grid view (top-down view of current room)
 pub fn draw_grid_view(ctx: &mut UiContext, rect: Rect, state: &mut EditorState) {
     // Background
@@ -98,6 +111,33 @@ pub fn draw_grid_view(ctx: &mut UiContext, rect: Rect, state: &mut EditorState) 
         }
     }
 
+    // Track hovered face for later (need to compute before drawing for highlight)
+    let mut hovered_face_preview: Option<usize> = None;
+    if inside {
+        for (face_idx, face) in room.faces.iter().enumerate() {
+            let v0 = room.vertices[face.indices[0]];
+            let v1 = room.vertices[face.indices[1]];
+            let v2 = room.vertices[face.indices[2]];
+            let v3 = room.vertices[face.indices[3]];
+
+            let s0 = world_to_screen(v0.x, v0.z);
+            let s1 = world_to_screen(v1.x, v1.z);
+            let s2 = world_to_screen(v2.x, v2.z);
+            let s3 = world_to_screen(v3.x, v3.z);
+
+            let in_face = if face.is_triangle {
+                point_in_triangle(mouse_pos.0, mouse_pos.1, s0, s1, s2)
+            } else {
+                point_in_quad(mouse_pos.0, mouse_pos.1, s0, s1, s2, s3)
+            };
+
+            if in_face {
+                hovered_face_preview = Some(face_idx);
+                break;
+            }
+        }
+    }
+
     // Draw room geometry (X-Z projection)
     // First pass: draw faces as filled polygons
     for (face_idx, face) in room.faces.iter().enumerate() {
@@ -111,22 +151,26 @@ pub fn draw_grid_view(ctx: &mut UiContext, rect: Rect, state: &mut EditorState) 
         let (sx2, sy2) = world_to_screen(v2.x, v2.z);
         let (sx3, sy3) = world_to_screen(v3.x, v3.z);
 
+        // Check if this face is selected or hovered
+        let is_selected = matches!(state.selection, Selection::Face { face, .. } if face == face_idx);
+        let is_hovered = hovered_face_preview == Some(face_idx);
+
         // Determine face type by normal (approximate from Y component)
-        // Floor faces have normal pointing up (negative Y in our system)
         let edge1 = (v1.x - v0.x, v1.y - v0.y, v1.z - v0.z);
         let edge2 = (v2.x - v0.x, v2.y - v0.y, v2.z - v0.z);
-        let normal_y = edge1.0 * edge2.2 - edge1.2 * edge2.0; // Cross product Y component
+        let normal_y = edge1.0 * edge2.2 - edge1.2 * edge2.0;
 
-        let fill_color = if normal_y.abs() > 0.5 {
-            // Floor/ceiling (horizontal face)
-            Color::from_rgba(60, 120, 120, 100) // Cyan-ish
+        let fill_color = if is_selected {
+            Color::from_rgba(255, 200, 100, 150) // Yellow-orange for selected
+        } else if is_hovered {
+            Color::from_rgba(150, 200, 255, 120) // Light blue for hover
+        } else if normal_y.abs() > 0.5 {
+            Color::from_rgba(60, 120, 120, 100) // Cyan-ish for floor/ceiling
         } else {
-            // Wall (vertical face)
-            Color::from_rgba(100, 80, 60, 80) // Brown-ish
+            Color::from_rgba(100, 80, 60, 80) // Brown-ish for walls
         };
 
-        // Draw as two triangles (simple fill)
-        // Note: macroquad doesn't have polygon fill, so we'll use triangles
+        // Draw as two triangles
         draw_triangle(
             Vec2::new(sx0, sy0),
             Vec2::new(sx1, sy1),
@@ -140,18 +184,6 @@ pub fn draw_grid_view(ctx: &mut UiContext, rect: Rect, state: &mut EditorState) 
                 Vec2::new(sx3, sy3),
                 fill_color,
             );
-        }
-
-        // Highlight selected face
-        if let super::Selection::Face { room: _, face: sel_face } = state.selection {
-            if sel_face == face_idx {
-                draw_triangle(
-                    Vec2::new(sx0, sy0),
-                    Vec2::new(sx1, sy1),
-                    Vec2::new(sx2, sy2),
-                    Color::from_rgba(255, 200, 100, 100),
-                );
-            }
         }
     }
 
@@ -218,6 +250,33 @@ pub fn draw_grid_view(ctx: &mut UiContext, rect: Rect, state: &mut EditorState) 
         }
     }
 
+    // Find face under mouse cursor (only if no vertex is hovered)
+    let mut hovered_face: Option<usize> = None;
+    if hovered_vertex.is_none() && inside {
+        for (face_idx, face) in room.faces.iter().enumerate() {
+            let v0 = room.vertices[face.indices[0]];
+            let v1 = room.vertices[face.indices[1]];
+            let v2 = room.vertices[face.indices[2]];
+            let v3 = room.vertices[face.indices[3]];
+
+            let s0 = world_to_screen(v0.x, v0.z);
+            let s1 = world_to_screen(v1.x, v1.z);
+            let s2 = world_to_screen(v2.x, v2.z);
+            let s3 = world_to_screen(v3.x, v3.z);
+
+            let in_face = if face.is_triangle {
+                point_in_triangle(mouse_pos.0, mouse_pos.1, s0, s1, s2)
+            } else {
+                point_in_quad(mouse_pos.0, mouse_pos.1, s0, s1, s2, s3)
+            };
+
+            if in_face {
+                hovered_face = Some(face_idx);
+                break;
+            }
+        }
+    }
+
     // Store room index for later mutation
     let current_room_idx = state.current_room;
 
@@ -254,15 +313,27 @@ pub fn draw_grid_view(ctx: &mut UiContext, rect: Rect, state: &mut EditorState) 
         draw_circle(ox, oy, 5.0, Color::from_rgba(255, 100, 100, 255));
     }
 
-    // Handle vertex selection and dragging (only with left mouse, and not panning)
+    // Handle selection and interaction (only with left mouse, and not panning)
     if inside && !state.grid_panning {
-        // Start dragging on left press
+        // Start action on left press
         if ctx.mouse.left_pressed {
             if let Some(vi) = hovered_vertex {
-                // Select and start dragging
+                // Vertex has priority - select and start dragging
                 state.selection = Selection::Vertex { room: current_room_idx, vertex: vi };
                 state.grid_dragging_vertex = Some(vi);
                 state.grid_drag_started = false;
+            } else if let Some(fi) = hovered_face {
+                // Face clicked - select it and apply texture
+                state.selection = Selection::Face { room: current_room_idx, face: fi };
+
+                // Apply selected texture to face
+                let texture_id = state.selected_texture;
+                state.save_undo();
+                if let Some(room) = state.level.rooms.get_mut(current_room_idx) {
+                    if let Some(face) = room.faces.get_mut(fi) {
+                        face.texture_id = texture_id;
+                    }
+                }
             } else {
                 // Clicked empty space - deselect
                 state.selection = Selection::None;

@@ -17,9 +17,10 @@ use rasterizer::{
     Camera, Color as RasterColor, Framebuffer, RasterSettings, ShadingMode, Texture,
     render_mesh, HEIGHT, WIDTH,
 };
-use world::{Level, create_test_level, load_level};
+use world::{Level, create_test_level, load_level, save_level};
 use ui::{UiContext, MouseState};
 use editor::{EditorState, EditorLayout, EditorAction, draw_editor};
+use std::path::PathBuf;
 
 /// Application mode
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -106,8 +107,17 @@ async fn main() {
     // App mode (game or editor) - start in editor
     let mut mode = AppMode::Editor;
 
-    // Editor state
-    let mut editor_state = EditorState::new(level.clone());
+    // Editor state - track the file we loaded from
+    let initial_file = if std::path::Path::new("assets/levels/test.ron").exists() {
+        Some(PathBuf::from("assets/levels/test.ron"))
+    } else {
+        None
+    };
+    let mut editor_state = if let Some(path) = initial_file {
+        EditorState::with_file(level.clone(), path)
+    } else {
+        EditorState::new(level.clone())
+    };
     let mut editor_layout = EditorLayout::new();
     let mut ui_ctx = UiContext::new();
 
@@ -286,9 +296,120 @@ async fn main() {
                 );
 
                 // Handle editor actions
-                if action == EditorAction::Play {
-                    mode = AppMode::Game;
-                    println!("Switched to Game mode");
+                match action {
+                    EditorAction::Play => {
+                        mode = AppMode::Game;
+                        println!("Switched to Game mode");
+                    }
+                    EditorAction::New => {
+                        // Create a new empty level with one room
+                        let new_level = create_test_level();
+                        editor_state = EditorState::new(new_level);
+                        editor_state.set_status("Created new level", 3.0);
+                        println!("Created new level");
+                    }
+                    EditorAction::Save => {
+                        // Save to current file, or prompt for Save As if no file
+                        if let Some(path) = &editor_state.current_file.clone() {
+                            match save_level(&editor_state.level, path) {
+                                Ok(()) => {
+                                    editor_state.dirty = false;
+                                    editor_state.set_status(&format!("Saved to {}", path.display()), 3.0);
+                                    println!("Saved level to {}", path.display());
+                                }
+                                Err(e) => {
+                                    editor_state.set_status(&format!("Save failed: {}", e), 5.0);
+                                    eprintln!("Failed to save: {}", e);
+                                }
+                            }
+                        } else {
+                            // No current file - save to default location
+                            let default_path = PathBuf::from("assets/levels/untitled.ron");
+                            // Ensure directory exists
+                            if let Some(parent) = default_path.parent() {
+                                let _ = std::fs::create_dir_all(parent);
+                            }
+                            match save_level(&editor_state.level, &default_path) {
+                                Ok(()) => {
+                                    editor_state.current_file = Some(default_path.clone());
+                                    editor_state.dirty = false;
+                                    editor_state.set_status(&format!("Saved to {}", default_path.display()), 3.0);
+                                    println!("Saved level to {}", default_path.display());
+                                }
+                                Err(e) => {
+                                    editor_state.set_status(&format!("Save failed: {}", e), 5.0);
+                                    eprintln!("Failed to save: {}", e);
+                                }
+                            }
+                        }
+                    }
+                    EditorAction::SaveAs => {
+                        // Show native save dialog (blocking on macOS)
+                        let default_dir = PathBuf::from("assets/levels");
+                        let _ = std::fs::create_dir_all(&default_dir);
+
+                        let dialog = rfd::FileDialog::new()
+                            .add_filter("RON Level", &["ron"])
+                            .set_directory(&default_dir)
+                            .set_file_name("level.ron");
+
+                        if let Some(save_path) = dialog.save_file() {
+                            match save_level(&editor_state.level, &save_path) {
+                                Ok(()) => {
+                                    editor_state.current_file = Some(save_path.clone());
+                                    editor_state.dirty = false;
+                                    editor_state.set_status(&format!("Saved as {}", save_path.display()), 3.0);
+                                    println!("Saved level as {}", save_path.display());
+                                }
+                                Err(e) => {
+                                    editor_state.set_status(&format!("Save failed: {}", e), 5.0);
+                                    eprintln!("Failed to save: {}", e);
+                                }
+                            }
+                        } else {
+                            editor_state.set_status("Save cancelled", 2.0);
+                        }
+                    }
+                    EditorAction::PromptLoad => {
+                        // Show native open dialog (blocking on macOS)
+                        let default_dir = PathBuf::from("assets/levels");
+                        let _ = std::fs::create_dir_all(&default_dir);
+
+                        let dialog = rfd::FileDialog::new()
+                            .add_filter("RON Level", &["ron"])
+                            .set_directory(&default_dir);
+
+                        if let Some(path) = dialog.pick_file() {
+                            match load_level(&path) {
+                                Ok(level) => {
+                                    editor_state = EditorState::with_file(level, path.clone());
+                                    editor_state.set_status(&format!("Loaded {}", path.display()), 3.0);
+                                    println!("Loaded level from {}", path.display());
+                                }
+                                Err(e) => {
+                                    editor_state.set_status(&format!("Load failed: {}", e), 5.0);
+                                    eprintln!("Failed to load: {}", e);
+                                }
+                            }
+                        } else {
+                            editor_state.set_status("Open cancelled", 2.0);
+                        }
+                    }
+                    EditorAction::Load(path_str) => {
+                        let path = PathBuf::from(&path_str);
+                        match load_level(&path) {
+                            Ok(level) => {
+                                editor_state = EditorState::with_file(level, path.clone());
+                                editor_state.set_status(&format!("Loaded {}", path.display()), 3.0);
+                                println!("Loaded level from {}", path.display());
+                            }
+                            Err(e) => {
+                                editor_state.set_status(&format!("Load failed: {}", e), 5.0);
+                                eprintln!("Failed to load {}: {}", path.display(), e);
+                            }
+                        }
+                    }
+                    EditorAction::None => {}
                 }
             }
         }
