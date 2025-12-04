@@ -63,6 +63,12 @@ pub struct EditorState {
     /// 3D viewport mouse state (for camera control)
     pub viewport_last_mouse: (f32, f32),
     pub viewport_mouse_captured: bool,
+
+    /// 2D grid view mouse state
+    pub grid_last_mouse: (f32, f32),
+    pub grid_panning: bool,
+    pub grid_dragging_vertex: Option<usize>,
+    pub grid_drag_started: bool, // True if we've started dragging (for undo)
 }
 
 impl EditorState {
@@ -87,6 +93,10 @@ impl EditorState {
             dirty: false,
             viewport_last_mouse: (0.0, 0.0),
             viewport_mouse_captured: false,
+            grid_last_mouse: (0.0, 0.0),
+            grid_panning: false,
+            grid_dragging_vertex: None,
+            grid_drag_started: false,
         }
     }
 

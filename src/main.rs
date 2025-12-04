@@ -80,13 +80,17 @@ async fn main() {
         }
     };
 
-    // Create textures for each room
-    let textures = vec![
-        // Texture 0: Orange/blue checkerboard (room 0)
-        Texture::checkerboard(32, 32, RasterColor::new(200, 100, 50), RasterColor::new(50, 100, 200)),
-        // Texture 1: Green/purple checkerboard (room 1)
-        Texture::checkerboard(32, 32, RasterColor::new(50, 200, 100), RasterColor::new(150, 50, 200)),
-    ];
+    // Load textures from assets/textures/SAMPLE, fall back to checkerboards
+    let mut textures = Texture::load_directory("assets/textures/SAMPLE");
+    if textures.is_empty() {
+        println!("No textures found in assets/textures/SAMPLE, using checkerboard fallbacks");
+        textures = vec![
+            Texture::checkerboard(32, 32, RasterColor::new(200, 100, 50), RasterColor::new(50, 100, 200)),
+            Texture::checkerboard(32, 32, RasterColor::new(50, 200, 100), RasterColor::new(150, 50, 200)),
+        ];
+    } else {
+        println!("Loaded {} textures", textures.len());
+    }
 
     // Rasterizer settings
     let mut settings = RasterSettings::default();

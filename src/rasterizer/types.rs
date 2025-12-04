@@ -105,6 +105,7 @@ pub struct Texture {
     pub width: usize,
     pub height: usize,
     pub pixels: Vec<Color>,
+    pub name: String,
 }
 
 impl Texture {
@@ -113,7 +114,71 @@ impl Texture {
             width,
             height,
             pixels: vec![Color::WHITE; width * height],
+            name: String::new(),
         }
+    }
+
+    /// Load texture from a PNG file
+    pub fn from_file<P: AsRef<std::path::Path>>(path: P) -> Result<Self, String> {
+        use image::GenericImageView;
+
+        let path = path.as_ref();
+        let img = image::open(path)
+            .map_err(|e| format!("Failed to load {}: {}", path.display(), e))?;
+
+        let (width, height) = img.dimensions();
+        let rgba = img.to_rgba8();
+
+        let pixels: Vec<Color> = rgba
+            .pixels()
+            .map(|p| Color::with_alpha(p[0], p[1], p[2], p[3]))
+            .collect();
+
+        let name = path
+            .file_stem()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_default();
+
+        Ok(Self {
+            width: width as usize,
+            height: height as usize,
+            pixels,
+            name,
+        })
+    }
+
+    /// Load all textures from a directory
+    pub fn load_directory<P: AsRef<std::path::Path>>(dir: P) -> Vec<Self> {
+        let dir = dir.as_ref();
+        let mut textures = Vec::new();
+
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            let mut paths: Vec<_> = entries
+                .filter_map(|e| e.ok())
+                .map(|e| e.path())
+                .filter(|p| {
+                    p.extension()
+                        .map(|ext| ext.to_ascii_lowercase() == "png")
+                        .unwrap_or(false)
+                })
+                .collect();
+
+            paths.sort();
+
+            for path in paths {
+                match Self::from_file(&path) {
+                    Ok(tex) => {
+                        println!("Loaded texture: {} ({}x{})", tex.name, tex.width, tex.height);
+                        textures.push(tex);
+                    }
+                    Err(e) => {
+                        eprintln!("{}", e);
+                    }
+                }
+            }
+        }
+
+        textures
     }
 
     /// Create a checkerboard test texture
@@ -125,7 +190,7 @@ impl Texture {
                 pixels.push(if checker { color1 } else { color2 });
             }
         }
-        Self { width, height, pixels }
+        Self { width, height, pixels, name: "checkerboard".to_string() }
     }
 
     /// Sample texture at UV coordinates (no filtering - PS1 style)

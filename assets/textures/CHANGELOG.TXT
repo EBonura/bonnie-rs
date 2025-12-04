@@ -1,0 +1,102 @@
+# CHANGELOG
+
+## v12 (12th November, 2023)
+
+- Reworked most of the tech wall textures to align with the 8px grid better.
+- Reworked all of the tech support and lighting textures.
+- Added 7 new tech panel textures.
+- Added tech switch, with on and off variants.
+- Added blue keycard variants of the tech doors.
+- Added blue keycard door trims.
+- Added 2 new concrete variant with slime lighting and warning signs.
+
+
+## v11 (16th July, 2023)
+
+- Added 12 new road/tarmac textures, with a range of potholes and road markings.
+- Added 3 pavement/sidekick textures.
+- Added a new weather wood variety.
+- Added 2 wooden fence textures (front and back)
+- Added weathered wooden cladding texture.
+
+## v10 (10th July, 2023)
+
+- Added a total of 65 new textures!
+- Added wood textures for the first time, including three different varieties, and a mixture of floors, walls, and crates.
+- Added a handful of sewer tiles and bricks, including some blood-stained varients.
+- Added 3 traditional hinged doors.
+- Added a new sand texture with some dunes in the surface.
+- Added 2 blood textures.
+- Added numerous new floor tiles.
+- Added 3 different varieties of glossy wall tiles, each in 3 different tile sizes.
+- Added a dead grass variant paths.
+- Added 10 wallpaper textures, with a variety of objects and props.
+- Added a new chrome pipes texture.
+
+## v9 (5th October, 2022)
+
+- Added a small version of the limestone bricks, to match the red brick version.
+- Added more small brick textures (red and limestone) with vines and grass.
+- Added an archway cut-out version of the hedge texture.
+- Added 3 dirt textures: one bare, one with stones, and one with a puddle.
+- Added 3 sand textures: small pebbles, larger stones, and footsteps!
+- Adjusted the colors of the grass texture.
+
+## v8 (31st August, 2022)
+
+- Updated the brick textures, increasing the spread of the bullet holes.
+- Added 2 large sandstone brick textures.
+- Added 2 steps textures to match the sandstone and red bricks.
+- Renamed the existing step texture to ledge.
+- Added 2 chain-link fence textures.
+- Added 6 stucco textures, 3 of which have exposed red bricks.
+- Added 3 hedge textures: sparse and dense variants, and a flowering variant.
+- Added a grass texture.
+- Adjusted the color of the BSOD terminal.
+
+## v7 (26th August, 2022)
+
+- Added 4 new brick textures, in 2 variants: large bricks and small bricks.
+
+## v6 (8th July, 2022)
+
+- Added 6 grid textures, with transparent versions.
+- Added a brown slime textures.
+- Added 6 new concrete textures, in two color variants.
+- Added 2 new floor variants for both the tech lab and toxic lab themes.
+- Added 2 new tech lab wall textures with air vents.
+- The various support pillar textures have been split up into separate textures, rather then four compressed into each 64x64 texture.
+- All of the textures have been lightened slightly.
+
+## v5 (5th July, 2022)
+
+- Added 30 new textures in a toxic waste lab theme: floors, ceiling lights, wall panels, support pillars and lights, doors, pipes, and slime.
+- Added 6 new tech lab door textures for vertically opening doors.
+- Added 6 new door trim textures.
+
+## v4 (25th June, 2022)
+
+- Added 4 computer panel textures, including one with a bullet hole, and one with the iconic BSOD!!!
+- Added 6 door textures, in three trim variants: metal, yellow and red; with and without damage.
+- Added versions of crates without pickup truck holes.
+- Recolored the dark crate versions and gave them a unique design.
+- Added crate tops for 64x64, 32x32, and 16x16.
+- Added simplified pipes texture.
+- Added 7 new tech walls, with no panel edges, ideal for making long corridors feel less repetitive.
+
+## v3 (23rd June, 2022)
+
+- Added 19 new stone tile ground textures, in three different variants: stone, mossy, and sandstone. For each variant there are two different layout patterns (square block and parquet), with various amounts of damage. The mossy version also has grass tuffs and water pools.
+- Added 4 new crate textures, in smaller sizes: 32x16 and 16x16.
+- Added 2 new rivets textures, for vertical strips of riveted metal, such as around doorways.
+- Updated some of the crate textures to add in more details.
+- Tweaked the lighting of most of the tech wall textures to soften them slightly.
+- Improved the overview file, with labels to make it easier to find textures.
+
+## v2 (21st June, 2022)
+
+- Added 10 new textures, consisting of 5 different crates, in two color variants, in three different sizes: 64x64, 64x32, and 32x32.
+
+## v1 (28th October, 2021)
+
+- An initial collection of 58 textures, mostly tech facility themed.
