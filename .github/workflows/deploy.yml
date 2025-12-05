@@ -37,6 +37,7 @@ jobs:
           cp target/wasm32-unknown-unknown/release/bonnie-rs.wasm deploy/
           cp docs/index.html deploy/
           cp mq_js_bundle.js deploy/
+          cp -r assets deploy/
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
