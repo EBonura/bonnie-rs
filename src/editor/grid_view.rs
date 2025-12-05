@@ -364,16 +364,22 @@ pub fn draw_grid_view(ctx: &mut UiContext, rect: Rect, state: &mut EditorState) 
                                     return false;
                                 }
 
+                                // Calculate the center of the existing face
                                 let num_verts = if face.is_triangle { 3 } else { 4 };
+                                let mut center_x = 0.0;
+                                let mut center_z = 0.0;
                                 for i in 0..num_verts {
                                     let v = room.vertices[face.indices[i]];
-                                    const EPSILON: f32 = 1.0;
-                                    if v.x >= snapped_x - EPSILON && v.x < snapped_x + SECTOR_SIZE + EPSILON &&
-                                       v.z >= snapped_z - EPSILON && v.z < snapped_z + SECTOR_SIZE + EPSILON {
-                                        return true;
-                                    }
+                                    center_x += v.x;
+                                    center_z += v.z;
                                 }
-                                false
+                                center_x /= num_verts as f32;
+                                center_z /= num_verts as f32;
+
+                                // Check if this face's center is within the sector we're trying to place
+                                const EPSILON: f32 = 1.0;
+                                center_x >= snapped_x + EPSILON && center_x < snapped_x + SECTOR_SIZE - EPSILON &&
+                                center_z >= snapped_z + EPSILON && center_z < snapped_z + SECTOR_SIZE - EPSILON
                             })
                         } else {
                             false
@@ -420,16 +426,22 @@ pub fn draw_grid_view(ctx: &mut UiContext, rect: Rect, state: &mut EditorState) 
                                     return false;
                                 }
 
+                                // Calculate the center of the existing face
                                 let num_verts = if face.is_triangle { 3 } else { 4 };
+                                let mut center_x = 0.0;
+                                let mut center_z = 0.0;
                                 for i in 0..num_verts {
                                     let v = room.vertices[face.indices[i]];
-                                    const EPSILON: f32 = 1.0;
-                                    if v.x >= snapped_x - EPSILON && v.x < snapped_x + SECTOR_SIZE + EPSILON &&
-                                       v.z >= snapped_z - EPSILON && v.z < snapped_z + SECTOR_SIZE + EPSILON {
-                                        return true;
-                                    }
+                                    center_x += v.x;
+                                    center_z += v.z;
                                 }
-                                false
+                                center_x /= num_verts as f32;
+                                center_z /= num_verts as f32;
+
+                                // Check if this face's center is within the sector we're trying to place
+                                const EPSILON: f32 = 1.0;
+                                center_x >= snapped_x + EPSILON && center_x < snapped_x + SECTOR_SIZE - EPSILON &&
+                                center_z >= snapped_z + EPSILON && center_z < snapped_z + SECTOR_SIZE - EPSILON
                             })
                         } else {
                             false

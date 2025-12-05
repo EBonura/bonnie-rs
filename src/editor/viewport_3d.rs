@@ -489,20 +489,23 @@ pub fn draw_viewport_3d(
                                         return false;
                                     }
 
-                                    // Get all vertices of this face
+                                    // Calculate the center of the existing face
                                     let num_verts = if face.is_triangle { 3 } else { 4 };
+                                    let mut center_x = 0.0;
+                                    let mut center_z = 0.0;
                                     for i in 0..num_verts {
                                         let v = room.vertices[face.indices[i]];
-
-                                        // Check if this vertex is within the sector we're trying to place
-                                        // A sector occupies [x, x+1024] x [z, z+1024]
-                                        const EPSILON: f32 = 1.0;
-                                        if v.x >= snapped_x - EPSILON && v.x < snapped_x + SECTOR_SIZE + EPSILON &&
-                                           v.z >= snapped_z - EPSILON && v.z < snapped_z + SECTOR_SIZE + EPSILON {
-                                            return true;
-                                        }
+                                        center_x += v.x;
+                                        center_z += v.z;
                                     }
-                                    false
+                                    center_x /= num_verts as f32;
+                                    center_z /= num_verts as f32;
+
+                                    // Check if this face's center is within the sector we're trying to place
+                                    // A sector occupies [x, x+1024] x [z, z+1024]
+                                    const EPSILON: f32 = 1.0;
+                                    center_x >= snapped_x + EPSILON && center_x < snapped_x + SECTOR_SIZE - EPSILON &&
+                                    center_z >= snapped_z + EPSILON && center_z < snapped_z + SECTOR_SIZE - EPSILON
                                 })
                             } else {
                                 false
