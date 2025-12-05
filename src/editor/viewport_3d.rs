@@ -347,6 +347,14 @@ pub fn draw_viewport_3d(
                             state.viewport_drag_initial_y = vec![clicked_pos.y];
                         }
 
+                        // Debug output
+                        println!("Clicked vertex {} at ({}, {}, {})", vert_idx, clicked_pos.x, clicked_pos.y, clicked_pos.z);
+                        println!("Link mode: {}, Dragging {} vertices: {:?}",
+                            state.link_coincident_vertices,
+                            state.viewport_dragging_vertices.len(),
+                            state.viewport_dragging_vertices
+                        );
+
                         state.viewport_drag_started = false;
                         state.viewport_drag_plane_y = clicked_pos.y; // Reference point for delta
                     }

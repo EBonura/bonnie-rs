@@ -17,7 +17,7 @@ use rasterizer::{
     Camera, Color as RasterColor, Framebuffer, RasterSettings, ShadingMode, Texture,
     render_mesh, HEIGHT, WIDTH,
 };
-use world::{Level, create_test_level, create_empty_level, load_level, save_level};
+use world::{Level, create_empty_level, load_level, save_level};
 use ui::{UiContext, MouseState};
 use editor::{EditorState, EditorLayout, EditorAction, draw_editor};
 use std::path::PathBuf;
@@ -69,15 +69,15 @@ async fn main() {
     let mut camera = Camera::new();
     camera.position = rasterizer::Vec3::new(0.0, 1.5, 0.0);
 
-    // Load level from file, fall back to hardcoded test level
+    // Load level from file, fall back to empty level with single floor tile
     let level = match load_level("assets/levels/test.ron") {
         Ok(l) => {
             println!("Loaded level from assets/levels/test.ron");
             l
         }
         Err(e) => {
-            println!("Failed to load level: {}, using hardcoded test level", e);
-            create_test_level()
+            println!("Failed to load level: {}, using empty level", e);
+            create_empty_level()
         }
     };
 
