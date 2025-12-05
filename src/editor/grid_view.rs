@@ -69,6 +69,14 @@ pub fn draw_grid_view(ctx: &mut UiContext, rect: Rect, state: &mut EditorState) 
         (sx, sy)
     };
 
+    // Enable scissor rectangle to clip drawing to viewport bounds
+    gl_use_default_material();
+    unsafe {
+        get_internal_gl().quad_gl.scissor(
+            Some((rect.x as i32, rect.y as i32, rect.w as i32, rect.h as i32))
+        );
+    }
+
     // Draw grid lines
     if state.show_grid {
         let grid_color = Color::from_rgba(40, 40, 45, 255);
@@ -524,5 +532,10 @@ pub fn draw_grid_view(ctx: &mut UiContext, rect: Rect, state: &mut EditorState) 
             state.grid_dragging_vertex = None;
             state.grid_drag_started = false;
         }
+    }
+
+    // Disable scissor rectangle to restore normal rendering
+    unsafe {
+        get_internal_gl().quad_gl.scissor(None);
     }
 }

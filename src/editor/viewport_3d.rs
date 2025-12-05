@@ -793,6 +793,14 @@ pub fn draw_viewport_3d(
     // Draw viewport border
     draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 1.0, Color::from_rgba(60, 60, 60, 255));
 
+    // Enable scissor rectangle to clip overlay drawing to viewport bounds
+    gl_use_default_material();
+    unsafe {
+        get_internal_gl().quad_gl.scissor(
+            Some((rect.x as i32, rect.y as i32, rect.w as i32, rect.h as i32))
+        );
+    }
+
     // Draw selected face outline as 2D overlay
     if let Some(screen_verts) = selected_face_screen_verts {
         let highlight_color = Color::from_rgba(255, 200, 50, 255);
@@ -896,6 +904,11 @@ pub fn draw_viewport_3d(
         14.0,
         Color::from_rgba(200, 200, 200, 255),
     );
+
+    // Disable scissor rectangle to restore normal rendering
+    unsafe {
+        get_internal_gl().quad_gl.scissor(None);
+    }
 }
 
 /// Draw a 3D line into the framebuffer using Bresenham's algorithm
