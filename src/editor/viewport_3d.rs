@@ -289,10 +289,11 @@ pub fn draw_viewport_3d(
                 state.viewport_dragging_vertices = vec![(room_idx, vert_idx)];
                 state.viewport_drag_started = false;
 
-                // Store the initial Y height (unsnapped) for accumulating deltas
+                // Store the initial Y height for this vertex
                 if let Some(room) = state.level.rooms.get(room_idx) {
                     if let Some(vert) = room.vertices.get(vert_idx) {
-                        state.viewport_drag_plane_y = vert.y;
+                        state.viewport_drag_plane_y = vert.y; // Reference point for delta
+                        state.viewport_drag_initial_y = vec![vert.y];
                     }
                 }
             } else if let Some((room_idx, v0, v1, _)) = hovered_edge {
@@ -301,37 +302,37 @@ pub fn draw_viewport_3d(
                 state.viewport_dragging_vertices = vec![(room_idx, v0), (room_idx, v1)];
                 state.viewport_drag_started = false;
 
-                // Store the average Y height of the edge
+                // Store initial Y positions of both vertices
                 if let Some(room) = state.level.rooms.get(room_idx) {
                     if let (Some(v0_pos), Some(v1_pos)) = (room.vertices.get(v0), room.vertices.get(v1)) {
-                        state.viewport_drag_plane_y = (v0_pos.y + v1_pos.y) / 2.0;
+                        state.viewport_drag_plane_y = (v0_pos.y + v1_pos.y) / 2.0; // Average as reference
+                        state.viewport_drag_initial_y = vec![v0_pos.y, v1_pos.y];
                     }
                 }
             } else if let Some((room_idx, face_idx)) = hovered_face {
                 // Select face
                 state.selection = Selection::Face { room: room_idx, face: face_idx };
 
-                // Only allow dragging for floors and ceilings, not walls
+                // Allow dragging for all face types now that we preserve relative heights
                 if let Some(room) = state.level.rooms.get(room_idx) {
                     if let Some(face) = room.faces.get(face_idx) {
-                        use crate::world::FaceType;
+                        // Collect all face vertices
+                        let num_verts = if face.is_triangle { 3 } else { 4 };
+                        state.viewport_dragging_vertices = (0..num_verts)
+                            .map(|i| (room_idx, face.indices[i]))
+                            .collect();
 
-                        if face.face_type != FaceType::Wall {
-                            // Collect all face vertices for floors/ceilings
-                            let num_verts = if face.is_triangle { 3 } else { 4 };
-                            state.viewport_dragging_vertices = (0..num_verts)
-                                .map(|i| (room_idx, face.indices[i]))
-                                .collect();
+                        // Store initial Y positions of all vertices
+                        state.viewport_drag_initial_y = (0..num_verts)
+                            .filter_map(|i| room.vertices.get(face.indices[i]))
+                            .map(|v| v.y)
+                            .collect();
 
-                            // Store the average Y height of the face
-                            let avg_y: f32 = (0..num_verts)
-                                .filter_map(|i| room.vertices.get(face.indices[i]))
-                                .map(|v| v.y)
-                                .sum::<f32>() / num_verts as f32;
-                            state.viewport_drag_plane_y = avg_y;
-                            state.viewport_drag_started = false;
-                        }
-                        // Walls can be selected but not dragged (would collapse them)
+                        // Store average Y as reference point for delta
+                        let avg_y: f32 = state.viewport_drag_initial_y.iter().sum::<f32>()
+                            / state.viewport_drag_initial_y.len() as f32;
+                        state.viewport_drag_plane_y = avg_y;
+                        state.viewport_drag_started = false;
                     }
                 }
             }
@@ -353,17 +354,22 @@ pub fn draw_viewport_3d(
                 let y_sensitivity = 5.0; // Increased sensitivity for better feel
                 let y_delta = mouse_delta_y * y_sensitivity;
 
-                // Accumulate delta into the unsnapped drag plane Y
+                // Accumulate delta into the unsnapped drag plane Y (reference point)
                 state.viewport_drag_plane_y += y_delta;
 
-                // Update all dragged vertices' Y positions with snapping during drag
-                let snapped_y = (state.viewport_drag_plane_y / CLICK_HEIGHT).round() * CLICK_HEIGHT;
+                // Calculate the delta from the initial average position
+                let delta_from_initial = state.viewport_drag_plane_y -
+                    (state.viewport_drag_initial_y.iter().sum::<f32>() / state.viewport_drag_initial_y.len() as f32);
 
-                for &(room_idx, vert_idx) in &state.viewport_dragging_vertices {
-                    if let Some(room) = state.level.rooms.get_mut(room_idx) {
-                        if let Some(v) = room.vertices.get_mut(vert_idx) {
-                            // Snap to CLICK_HEIGHT grid while dragging
-                            v.y = snapped_y;
+                // Apply delta to each vertex's initial position, preserving relative heights
+                for (i, &(room_idx, vert_idx)) in state.viewport_dragging_vertices.iter().enumerate() {
+                    if let Some(initial_y) = state.viewport_drag_initial_y.get(i) {
+                        if let Some(room) = state.level.rooms.get_mut(room_idx) {
+                            if let Some(v) = room.vertices.get_mut(vert_idx) {
+                                // Apply delta to initial position and snap
+                                let new_y = initial_y + delta_from_initial;
+                                v.y = (new_y / CLICK_HEIGHT).round() * CLICK_HEIGHT;
+                            }
                         }
                     }
                 }
@@ -382,6 +388,7 @@ pub fn draw_viewport_3d(
             }
 
             state.viewport_dragging_vertices.clear();
+            state.viewport_drag_initial_y.clear();
             state.viewport_drag_started = false;
         }
     }

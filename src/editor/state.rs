@@ -141,7 +141,8 @@ pub struct EditorState {
     /// 3D viewport vertex dragging state
     pub viewport_dragging_vertices: Vec<(usize, usize)>, // List of (room_idx, vertex_idx)
     pub viewport_drag_started: bool,
-    pub viewport_drag_plane_y: f32, // Y height of the drag plane
+    pub viewport_drag_plane_y: f32, // Y height of the drag plane (reference point for delta)
+    pub viewport_drag_initial_y: Vec<f32>, // Initial Y positions of each dragged vertex
 
     /// Texture palette state
     pub texture_packs: Vec<TexturePack>,
@@ -193,6 +194,7 @@ impl EditorState {
             viewport_dragging_vertices: Vec::new(),
             viewport_drag_started: false,
             viewport_drag_plane_y: 0.0,
+            viewport_drag_initial_y: Vec::new(),
             texture_packs,
             selected_pack: 0,
             texture_scroll: 0.0,
