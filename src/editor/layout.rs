@@ -395,20 +395,23 @@ fn draw_properties(_ctx: &mut UiContext, rect: Rect, state: &mut EditorState) {
 fn draw_status_bar(rect: Rect, state: &EditorState) {
     draw_rectangle(rect.x.floor(), rect.y.floor(), rect.w, rect.h, Color::from_rgba(40, 40, 45, 255));
 
-    // Show status message if available, otherwise show default status
-    let status = if let Some(msg) = state.get_status() {
-        msg.to_string()
-    } else {
-        format!(
-            "Room: {} | Tool: {:?} | Zoom: {:.1}x | {}",
-            state.current_room,
-            state.tool,
-            state.grid_zoom / 20.0,
-            if state.dirty { "Modified" } else { "Saved" }
-        )
-    };
+    // Camera position and rotation display (left side)
+    let cam_info = format!(
+        "Cam: ({:.0}, {:.0}, {:.0}) | Rot: ({:.2}, {:.2})",
+        state.camera_3d.position.x,
+        state.camera_3d.position.y,
+        state.camera_3d.position.z,
+        state.camera_3d.rotation_x,
+        state.camera_3d.rotation_y
+    );
+    draw_text(&cam_info, (rect.x + 8.0).floor(), (rect.y + 15.0).floor(), 16.0, WHITE);
 
-    draw_text(&status, (rect.x + 8.0).floor(), (rect.y + 15.0).floor(), 16.0, WHITE);
+    // Show status message in center if available
+    if let Some(msg) = state.get_status() {
+        let msg_width = msg.len() as f32 * 8.0;
+        let center_x = rect.x + rect.w * 0.5 - msg_width * 0.5;
+        draw_text(&msg, center_x.floor(), (rect.y + 15.0).floor(), 16.0, Color::from_rgba(100, 255, 100, 255));
+    }
 
     // Show keyboard shortcuts hint on the right (platform-specific)
     #[cfg(not(target_arch = "wasm32"))]

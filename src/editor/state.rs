@@ -151,9 +151,9 @@ pub struct EditorState {
 impl EditorState {
     pub fn new(level: Level) -> Self {
         let mut camera_3d = Camera::new();
-        // Position camera for TRLE-sized geometry (1024 units)
-        // Start at center of first sector, looking down at it
-        camera_3d.position = Vec3::new(512.0, 2048.0, -512.0);
+        // Position camera above the floor tile, looking down at angle
+        // Good view of single 1024×1024 sector at origin
+        camera_3d.position = Vec3::new(-1947.0, -3211.0, -2692.0);
 
         // Discover all texture packs
         let texture_packs = TexturePack::discover_all();
