@@ -28,12 +28,15 @@ jobs:
       - name: Build WASM
         run: cargo build --release --target wasm32-unknown-unknown
 
+      - name: Download macroquad JS bundle
+        run: curl -L -o mq_js_bundle.js https://raw.githubusercontent.com/not-fl3/macroquad/master/js/mq_js_bundle.js
+
       - name: Prepare deploy folder
         run: |
           mkdir -p deploy
           cp target/wasm32-unknown-unknown/release/bonnie-rs.wasm deploy/
           cp docs/index.html deploy/
-          cp docs/mq_js_bundle.js deploy/
+          cp mq_js_bundle.js deploy/
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

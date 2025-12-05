@@ -53,6 +53,14 @@ This project uses the following free texture packs:
 - **Dark Fantasy Townhouse 64x64 Texture Pack** by Level Eleven Games
   https://level-eleven-games.itch.io/dark-fantasy-townhouse-64x64-texture-pack
 
+## Roadmap
+
+- [ ] Cross-platform file save/load (browser and desktop)
+- [ ] Audio system with sequencer/tracker
+- [ ] Particle system (dust, sparks, blood splatter)
+- [ ] Sprite/billboard rendering (classic PS1 technique for trees, items, enemies)
+- [ ] UI system (XMB-style menus, inventory screens)
+
 ## Acknowledgments
 
 The software rasterizer is based on [tipsy](https://github.com/nkanaev/tipsy), a minimal PS1-style software renderer written in C99 by nkanaev.
