@@ -11,6 +11,7 @@ mod rasterizer;
 mod world;
 mod ui;
 mod editor;
+mod xmb;
 
 use macroquad::prelude::*;
 use rasterizer::{
@@ -25,6 +26,7 @@ use std::path::PathBuf;
 /// Application mode
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum AppMode {
+    XMB,      // Landing page / main menu
     Game,
     Editor,
 }
@@ -120,8 +122,11 @@ async fn main() {
     // Track which room camera is in
     let mut current_room: Option<usize> = Some(0);
 
-    // App mode (game or editor) - start in editor
-    let mut mode = AppMode::Editor;
+    // App mode - start with XMB landing page
+    let mut mode = AppMode::XMB;
+
+    // XMB state
+    let mut xmb_state = xmb::XMBState::new();
 
     // Editor state - track the file we loaded from
     let initial_file = if std::path::Path::new("assets/levels/test.ron").exists() {
@@ -137,17 +142,18 @@ async fn main() {
     let mut editor_layout = EditorLayout::new();
     let mut ui_ctx = UiContext::new();
 
-    println!("=== bonnie-rs ===");
-    println!("Controls:");
-    println!("  Editor: Click 'Play' to test level");
-    println!("  Game: Press Esc to return to editor");
+    println!("=== Bonnie Engine ===");
+    println!("XMB Controls:");
+    println!("  Arrow keys: Navigate menu");
+    println!("  Enter/Click: Select item");
+    println!("  Esc: Return to XMB from any mode");
+    println!();
+    println!("Game Controls:");
     println!("  Right-click + drag: Look around");
     println!("  WASD: Move camera");
     println!("  Q/E: Move up/down");
-    println!("  1/2/3: Shading mode (None/Flat/Gouraud)");
-    println!("  P: Toggle perspective correction");
-    println!("  J: Toggle vertex jitter");
-    println!("  Z: Toggle Z-buffer");
+    println!("  1/2/3: Shading mode");
+    println!("  P/J/Z: Toggle PS1 effects");
 
     loop {
         // Update UI context with mouse state
@@ -166,6 +172,45 @@ async fn main() {
         ui_ctx.begin_frame(mouse_state);
 
         match mode {
+            AppMode::XMB => {
+                // Update XMB animations
+                xmb_state.update(get_frame_time());
+
+                // Process XMB input (now uses screen coordinates directly)
+                let xmb_result = xmb::process_input(&mut xmb_state);
+
+                // Handle XMB actions
+                match xmb_result {
+                    xmb::XMBInputResult::Activate(action) => {
+                        match action {
+                            xmb::XMBAction::LaunchEditor => {
+                                mode = AppMode::Editor;
+                                println!("Launched Editor");
+                            }
+                            xmb::XMBAction::LaunchGame => {
+                                xmb_state.set_status("Game not yet implemented", 2.5);
+                            }
+                            xmb::XMBAction::LaunchTracker => {
+                                xmb_state.set_status("Sound tools not yet implemented", 2.5);
+                            }
+                            xmb::XMBAction::OpenSettings => {
+                                xmb_state.set_status("Settings not yet implemented", 2.5);
+                            }
+                            _ => {}
+                        }
+                    }
+                    xmb::XMBInputResult::Cancel => {
+                        // Escape from XMB - could show exit confirmation
+                        println!("Press Escape again to exit");
+                    }
+                    xmb::XMBInputResult::None => {}
+                }
+
+                // Render XMB directly to screen (crisp text at any resolution)
+                clear_background(BLACK);
+                xmb::draw_xmb(&xmb_state);
+            }
+
             AppMode::Game => {
                 // Toggle settings
                 if is_key_pressed(KeyCode::Key1) {
@@ -290,12 +335,12 @@ async fn main() {
                     &format!("Pos: ({:.1}, {:.1}, {:.1})", camera.position.x, camera.position.y, camera.position.z),
                     10.0, 60.0, 20.0, WHITE
                 );
-                draw_text("[Esc] Editor", 10.0, 80.0, 16.0, Color::from_rgba(150, 150, 150, 255));
+                draw_text("[Esc] Return to XMB", 10.0, 80.0, 16.0, Color::from_rgba(150, 150, 150, 255));
 
-                // Return to editor with Escape
+                // Return to XMB with Escape
                 if is_key_pressed(KeyCode::Escape) {
-                    mode = AppMode::Editor;
-                    println!("Switched to Editor mode");
+                    mode = AppMode::XMB;
+                    println!("Returned to XMB");
                 }
             }
 
@@ -559,6 +604,10 @@ async fn main() {
                                 eprintln!("Failed to load {}: {}", path.display(), e);
                             }
                         }
+                    }
+                    EditorAction::Exit => {
+                        mode = AppMode::XMB;
+                        println!("Returned to XMB");
                     }
                     EditorAction::None => {}
                 }

@@ -102,32 +102,23 @@ impl XMBCategory {
 /// Creates the default XMB menu structure
 pub fn create_default_menu() -> Vec<XMBCategory> {
     vec![
-        // Level Tools Category
-        XMBCategory::new("Level Tools")
+        // Tools Category - All creation tools
+        XMBCategory::new("Tools")
             .with_icon(IconType::Editor)
             .add_item(
-                XMBItem::new("Level Editor", XMBAction::LaunchEditor)
-                    .with_description("Create and edit levels with the integrated TRLE-style editor")
+                XMBItem::new("World Editor", XMBAction::LaunchEditor)
+                    .with_description("Create and edit worlds with the integrated TRLE-style editor")
                     .with_icon(IconType::Editor)
-            )
-            .add_item(
-                XMBItem::new("New Level", XMBAction::LaunchEditor)
-                    .with_description("Start a new level from scratch")
-                    .with_icon(IconType::File)
-            ),
-
-        // Audio Tools Category
-        XMBCategory::new("Audio Tools")
-            .with_icon(IconType::Audio)
-            .add_item(
-                XMBItem::new("Tracker", XMBAction::LaunchTracker)
-                    .with_description("Picotron-style audio tracker and synthesizer")
-                    .with_icon(IconType::Tracker)
             )
             .add_item(
                 XMBItem::new("Sound Designer", XMBAction::LaunchTracker)
                     .with_description("Design instruments and sound effects")
                     .with_icon(IconType::Audio)
+            )
+            .add_item(
+                XMBItem::new("Tracker", XMBAction::LaunchTracker)
+                    .with_description("Picotron-style audio tracker and synthesizer")
+                    .with_icon(IconType::Tracker)
             ),
 
         // Game Category
@@ -137,29 +128,14 @@ pub fn create_default_menu() -> Vec<XMBCategory> {
                 XMBItem::new("Play", XMBAction::LaunchGame)
                     .with_description("Start playing the game")
                     .with_icon(IconType::Game)
-            )
-            .add_item(
-                XMBItem::new("Continue", XMBAction::LaunchGame)
-                    .with_description("Continue from last checkpoint")
-                    .with_icon(IconType::Game)
             ),
 
         // Settings Category
         XMBCategory::new("Settings")
             .with_icon(IconType::Settings)
             .add_item(
-                XMBItem::new("Graphics", XMBAction::OpenSettings)
-                    .with_description("PS1 effects, resolution, and rendering options")
-                    .with_icon(IconType::Settings)
-            )
-            .add_item(
-                XMBItem::new("Controls", XMBAction::OpenSettings)
-                    .with_description("Keyboard and mouse settings")
-                    .with_icon(IconType::Settings)
-            )
-            .add_item(
-                XMBItem::new("About", XMBAction::OpenSettings)
-                    .with_description("About Bonnie Engine")
+                XMBItem::new("Options", XMBAction::OpenSettings)
+                    .with_description("Graphics, controls, and engine settings")
                     .with_icon(IconType::Settings)
             ),
     ]

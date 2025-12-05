@@ -12,4 +12,4 @@ pub mod input;
 pub use menu::{XMBAction, XMBCategory, XMBItem, IconType, create_default_menu};
 pub use state::XMBState;
 pub use render::draw_xmb;
-pub use input::{process_input, check_activation, XMBInputResult};
+pub use input::{process_input, process_input_with_mouse, check_activation, XMBInputResult};

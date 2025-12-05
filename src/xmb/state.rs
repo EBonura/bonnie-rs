@@ -20,6 +20,10 @@ pub struct XMBState {
     pub time: f32,
     /// Selection pulse animation (0.0 to 1.0)
     pub pulse: f32,
+    /// Status message to display (e.g., "Not yet implemented")
+    pub status_message: Option<String>,
+    /// Time remaining to show status message
+    pub status_timer: f32,
 }
 
 impl XMBState {
@@ -33,6 +37,8 @@ impl XMBState {
             item_scroll: 0.0,
             time: 0.0,
             pulse: 0.0,
+            status_message: None,
+            status_timer: 0.0,
         }
     }
 
@@ -46,7 +52,21 @@ impl XMBState {
             item_scroll: 0.0,
             time: 0.0,
             pulse: 0.0,
+            status_message: None,
+            status_timer: 0.0,
         }
+    }
+
+    /// Set a status message to display temporarily
+    pub fn set_status(&mut self, message: &str, duration: f32) {
+        self.status_message = Some(message.to_string());
+        self.status_timer = duration;
+    }
+
+    /// Clear the status message
+    pub fn clear_status(&mut self) {
+        self.status_message = None;
+        self.status_timer = 0.0;
     }
 
     /// Update animations (call once per frame with delta time)
@@ -62,6 +82,14 @@ impl XMBState {
 
         self.category_scroll = Self::ease_towards(self.category_scroll, target_category, dt * 8.0);
         self.item_scroll = Self::ease_towards(self.item_scroll, target_item, dt * 10.0);
+
+        // Update status message timer
+        if self.status_timer > 0.0 {
+            self.status_timer -= dt;
+            if self.status_timer <= 0.0 {
+                self.status_message = None;
+            }
+        }
     }
 
     /// Smooth easing function

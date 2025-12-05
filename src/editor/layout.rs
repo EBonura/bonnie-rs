@@ -20,6 +20,7 @@ pub enum EditorAction {
     PromptLoad,   // Show file prompt
     Export,       // Browser: download as file
     Import,       // Browser: upload file
+    Exit,         // Return to XMB menu
 }
 
 /// Editor layout state (split panel ratios)
@@ -182,6 +183,13 @@ fn draw_menu_bar(ctx: &mut UiContext, rect: Rect, state: &mut EditorState) -> Ed
     // Play button
     if toolbar.button(ctx, "Play", 50.0) {
         action = EditorAction::Play;
+    }
+
+    toolbar.separator();
+
+    // Exit button (return to XMB)
+    if toolbar.button(ctx, "Exit", 40.0) {
+        action = EditorAction::Exit;
     }
 
     // Check keyboard shortcuts (Ctrl/Cmd + key)
