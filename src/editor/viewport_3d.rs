@@ -265,14 +265,29 @@ pub fn draw_viewport_3d(
     // Clear framebuffer
     fb.clear(RasterColor::new(30, 30, 40));
 
-    // Draw grid on floor (Y=0) if enabled
+    // Draw grid on floor if enabled
     if state.show_grid {
         let grid_color = RasterColor::new(50, 50, 60);
         let grid_size = state.grid_size;
-        let grid_extent = 20.0; // How far the grid extends
+        let grid_extent = 10240.0; // Cover approximately 10 sectors in each direction
+
+        // Calculate grid Y position based on lowest vertex in all rooms
+        let mut grid_y = 0.0;
+        if !state.level.rooms.is_empty() {
+            let mut min_y = f32::MAX;
+            for room in &state.level.rooms {
+                for vert in &room.vertices {
+                    let world_y = vert.y + room.position.y;
+                    min_y = min_y.min(world_y);
+                }
+            }
+            if min_y != f32::MAX {
+                grid_y = min_y;
+            }
+        }
 
         // Draw grid lines - use shorter segments for better clipping behavior
-        let segment_length: f32 = 4.0;
+        let segment_length: f32 = 1024.0; // One sector per segment
 
         // X-parallel lines (varying X, fixed Z)
         let mut z: f32 = -grid_extent;
@@ -282,8 +297,8 @@ pub fn draw_viewport_3d(
                 let x_end = (x + segment_length).min(grid_extent);
                 draw_3d_line(
                     fb,
-                    Vec3::new(x, 0.0, z),
-                    Vec3::new(x_end, 0.0, z),
+                    Vec3::new(x, grid_y, z),
+                    Vec3::new(x_end, grid_y, z),
                     &state.camera_3d,
                     grid_color,
                 );
@@ -300,8 +315,8 @@ pub fn draw_viewport_3d(
                 let z_end = (z + segment_length).min(grid_extent);
                 draw_3d_line(
                     fb,
-                    Vec3::new(x, 0.0, z),
-                    Vec3::new(x, 0.0, z_end),
+                    Vec3::new(x, grid_y, z),
+                    Vec3::new(x, grid_y, z_end),
                     &state.camera_3d,
                     grid_color,
                 );
@@ -314,13 +329,13 @@ pub fn draw_viewport_3d(
         let mut x = -grid_extent;
         while x < grid_extent {
             let x_end = (x + segment_length).min(grid_extent);
-            draw_3d_line(fb, Vec3::new(x, 0.0, 0.0), Vec3::new(x_end, 0.0, 0.0), &state.camera_3d, RasterColor::new(100, 60, 60));
+            draw_3d_line(fb, Vec3::new(x, grid_y, 0.0), Vec3::new(x_end, grid_y, 0.0), &state.camera_3d, RasterColor::new(100, 60, 60));
             x += segment_length;
         }
         let mut z = -grid_extent;
         while z < grid_extent {
             let z_end = (z + segment_length).min(grid_extent);
-            draw_3d_line(fb, Vec3::new(0.0, 0.0, z), Vec3::new(0.0, 0.0, z_end), &state.camera_3d, RasterColor::new(60, 60, 100));
+            draw_3d_line(fb, Vec3::new(0.0, grid_y, z), Vec3::new(0.0, grid_y, z_end), &state.camera_3d, RasterColor::new(60, 60, 100));
             z += segment_length;
         }
     }
