@@ -274,6 +274,25 @@ fn draw_toolbar(ctx: &mut UiContext, rect: Rect, state: &mut EditorState) {
 
     toolbar.separator();
 
+    // Vertex mode toggle
+    let link_label = if state.link_coincident_vertices { "Link: ON" } else { "Link: OFF" };
+    let link_color = if state.link_coincident_vertices {
+        Color::from_rgba(100, 200, 100, 255)
+    } else {
+        Color::from_rgba(200, 100, 100, 255)
+    };
+    // Draw colored background for the button
+    let btn_rect = Rect::new(toolbar.cursor_x(), rect.y + 2.0, 65.0, rect.h - 4.0);
+    draw_rectangle(btn_rect.x, btn_rect.y, btn_rect.w, btn_rect.h,
+        Color::new(link_color.r as f32 / 255.0, link_color.g as f32 / 255.0, link_color.b as f32 / 255.0, 0.4));
+    if toolbar.button(ctx, link_label, 65.0) {
+        state.link_coincident_vertices = !state.link_coincident_vertices;
+        let mode = if state.link_coincident_vertices { "Linked" } else { "Independent" };
+        state.set_status(&format!("Vertex mode: {}", mode), 2.0);
+    }
+
+    toolbar.separator();
+
     // Room navigation
     toolbar.label(&format!("Room: {}", state.current_room));
 
