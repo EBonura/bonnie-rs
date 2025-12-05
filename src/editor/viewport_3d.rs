@@ -707,13 +707,13 @@ pub fn draw_viewport_3d(
         render_mesh(fb, &vertices, &faces, textures, &state.camera_3d, settings);
     }
 
-    // Collect vertex screen positions for overlay drawing
-    let mut vertex_overlays: Vec<(f32, f32, bool, bool)> = Vec::new(); // (screen_x, screen_y, is_selected, is_hovered)
+    // Draw vertex overlays directly into framebuffer
+    use crate::rasterizer::Color as RasterColor;
 
     for (room_idx, room) in state.level.rooms.iter().enumerate() {
         for (vert_idx, vert) in room.vertices.iter().enumerate() {
             let world_pos = *vert + room.position;
-            if let Some((fb_sx, fb_sy)) = world_to_screen(
+            if let Some((fb_x, fb_y)) = world_to_screen(
                 world_pos,
                 state.camera_3d.position,
                 state.camera_3d.basis_x,
@@ -726,14 +726,71 @@ pub fn draw_viewport_3d(
                 let is_hovered = hovered_vertex.map_or(false, |(ri, vi, _)| ri == room_idx && vi == vert_idx);
                 let is_dragging = state.viewport_dragging_vertices.contains(&(room_idx, vert_idx));
 
-                vertex_overlays.push((fb_sx, fb_sy, is_selected || is_dragging, is_hovered));
+                // Choose color based on state
+                let color = if is_selected || is_dragging {
+                    RasterColor::new(100, 255, 100) // Green when selected/dragging
+                } else if is_hovered {
+                    RasterColor::new(255, 200, 150) // Orange when hovered
+                } else {
+                    RasterColor::with_alpha(200, 200, 220, 200) // Default (slightly transparent)
+                };
+
+                // Choose radius
+                let radius = if is_selected || is_hovered { 5 } else { 3 };
+
+                // Draw circle directly into framebuffer
+                fb.draw_circle(fb_x as i32, fb_y as i32, radius, color);
             }
         }
     }
 
-    // Store selected face edges for overlay
-    let mut selected_face_screen_verts: Option<Vec<(f32, f32)>> = None;
+    // Draw hovered edge highlight directly into framebuffer
+    if let Some((room_idx, v0_idx, v1_idx, _)) = hovered_edge {
+        if let Some(room) = state.level.rooms.get(room_idx) {
+            let v0 = room.vertices[v0_idx] + room.position;
+            let v1 = room.vertices[v1_idx] + room.position;
 
+            if let (Some((sx0, sy0)), Some((sx1, sy1))) = (
+                world_to_screen(v0, state.camera_3d.position, state.camera_3d.basis_x,
+                    state.camera_3d.basis_y, state.camera_3d.basis_z, fb.width, fb.height),
+                world_to_screen(v1, state.camera_3d.position, state.camera_3d.basis_x,
+                    state.camera_3d.basis_y, state.camera_3d.basis_z, fb.width, fb.height)
+            ) {
+                fb.draw_thick_line(sx0 as i32, sy0 as i32, sx1 as i32, sy1 as i32, 3, RasterColor::new(255, 200, 100));
+            }
+        }
+    }
+
+    // Draw hovered face highlight directly into framebuffer
+    if let Some((room_idx, face_idx)) = hovered_face {
+        if let Some(room) = state.level.rooms.get(room_idx) {
+            if let Some(face) = room.faces.get(face_idx) {
+                let num_verts = if face.is_triangle { 3 } else { 4 };
+                let mut screen_verts = Vec::new();
+
+                for i in 0..num_verts {
+                    let v = room.vertices[face.indices[i]] + room.position;
+                    if let Some((sx, sy)) = world_to_screen(v, state.camera_3d.position,
+                        state.camera_3d.basis_x, state.camera_3d.basis_y, state.camera_3d.basis_z,
+                        fb.width, fb.height)
+                    {
+                        screen_verts.push((sx as i32, sy as i32));
+                    }
+                }
+
+                // Draw edges
+                if screen_verts.len() >= 3 {
+                    for i in 0..screen_verts.len() {
+                        let (x0, y0) = screen_verts[i];
+                        let (x1, y1) = screen_verts[(i + 1) % screen_verts.len()];
+                        fb.draw_thick_line(x0, y0, x1, y1, 2, RasterColor::with_alpha(150, 200, 255, 200));
+                    }
+                }
+            }
+        }
+    }
+
+    // Draw selected face outline directly into framebuffer
     if let Selection::Face { room: room_idx, face: face_idx } = state.selection {
         if let Some(room) = state.level.rooms.get(room_idx) {
             if let Some(face) = room.faces.get(face_idx) {
@@ -749,8 +806,6 @@ pub fn draw_viewport_3d(
                 };
 
                 let mut screen_verts = Vec::new();
-                let mut all_visible = true;
-
                 for v in &world_verts {
                     if let Some((sx, sy)) = world_to_screen(
                         *v,
@@ -761,15 +816,25 @@ pub fn draw_viewport_3d(
                         fb.width,
                         fb.height,
                     ) {
-                        screen_verts.push((sx, sy));
-                    } else {
-                        all_visible = false;
-                        break;
+                        screen_verts.push((sx as i32, sy as i32));
                     }
                 }
 
-                if all_visible && screen_verts.len() >= 3 {
-                    selected_face_screen_verts = Some(screen_verts);
+                // Draw outline and vertex circles
+                if screen_verts.len() >= 3 {
+                    let highlight_color = RasterColor::new(255, 200, 50);
+
+                    // Draw outline edges
+                    for i in 0..screen_verts.len() {
+                        let (x0, y0) = screen_verts[i];
+                        let (x1, y1) = screen_verts[(i + 1) % screen_verts.len()];
+                        fb.draw_thick_line(x0, y0, x1, y1, 2, highlight_color);
+                    }
+
+                    // Draw vertex circles at corners
+                    for (x, y) in &screen_verts {
+                        fb.draw_circle(*x, *y, 4, highlight_color);
+                    }
                 }
             }
         }
@@ -793,102 +858,6 @@ pub fn draw_viewport_3d(
     // Draw viewport border
     draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 1.0, Color::from_rgba(60, 60, 60, 255));
 
-    // Enable scissor rectangle to clip overlay drawing to viewport bounds
-    gl_use_default_material();
-    unsafe {
-        get_internal_gl().quad_gl.scissor(
-            Some((rect.x as i32, rect.y as i32, rect.w as i32, rect.h as i32))
-        );
-    }
-
-    // Draw selected face outline as 2D overlay
-    if let Some(screen_verts) = selected_face_screen_verts {
-        let highlight_color = Color::from_rgba(255, 200, 50, 255);
-        let n = screen_verts.len();
-
-        for i in 0..n {
-            let (x1, y1) = fb_to_screen(screen_verts[i].0, screen_verts[i].1);
-            let (x2, y2) = fb_to_screen(screen_verts[(i + 1) % n].0, screen_verts[(i + 1) % n].1);
-            draw_line(x1, y1, x2, y2, 2.0, highlight_color);
-        }
-
-        for (fx, fy) in &screen_verts {
-            let (sx, sy) = fb_to_screen(*fx, *fy);
-            draw_circle(sx, sy, 4.0, highlight_color);
-        }
-    }
-
-    // Draw hovered edge highlight
-    if let Some((room_idx, v0_idx, v1_idx, _)) = hovered_edge {
-        if let Some(room) = state.level.rooms.get(room_idx) {
-            let v0 = room.vertices[v0_idx] + room.position;
-            let v1 = room.vertices[v1_idx] + room.position;
-
-            if let (Some((sx0, sy0)), Some((sx1, sy1))) = (
-                world_to_screen(v0, state.camera_3d.position, state.camera_3d.basis_x,
-                    state.camera_3d.basis_y, state.camera_3d.basis_z, fb.width, fb.height),
-                world_to_screen(v1, state.camera_3d.position, state.camera_3d.basis_x,
-                    state.camera_3d.basis_y, state.camera_3d.basis_z, fb.width, fb.height)
-            ) {
-                let (screen_x0, screen_y0) = fb_to_screen(sx0, sy0);
-                let (screen_x1, screen_y1) = fb_to_screen(sx1, sy1);
-                draw_line(screen_x0, screen_y0, screen_x1, screen_y1, 3.0, Color::from_rgba(255, 200, 100, 255));
-            }
-        }
-    }
-
-    // Draw hovered face highlight
-    if let Some((room_idx, face_idx)) = hovered_face {
-        if let Some(room) = state.level.rooms.get(room_idx) {
-            if let Some(face) = room.faces.get(face_idx) {
-                let num_verts = if face.is_triangle { 3 } else { 4 };
-                let mut screen_verts = Vec::new();
-
-                for i in 0..num_verts {
-                    let v = room.vertices[face.indices[i]] + room.position;
-                    if let Some((sx, sy)) = world_to_screen(v, state.camera_3d.position,
-                        state.camera_3d.basis_x, state.camera_3d.basis_y, state.camera_3d.basis_z,
-                        fb.width, fb.height)
-                    {
-                        let (screen_x, screen_y) = fb_to_screen(sx, sy);
-                        screen_verts.push((screen_x, screen_y));
-                    }
-                }
-
-                // Draw semi-transparent overlay
-                if screen_verts.len() >= 3 {
-                    // Draw edges
-                    for i in 0..screen_verts.len() {
-                        let (x0, y0) = screen_verts[i];
-                        let (x1, y1) = screen_verts[(i + 1) % screen_verts.len()];
-                        draw_line(x0, y0, x1, y1, 2.0, Color::from_rgba(150, 200, 255, 200));
-                    }
-                }
-            }
-        }
-    }
-
-    // Draw vertex overlays
-    for (fb_x, fb_y, is_selected, is_hovered) in vertex_overlays {
-        let (sx, sy) = fb_to_screen(fb_x, fb_y);
-
-        // Skip if outside viewport
-        if sx < rect.x || sx > rect.right() || sy < rect.y || sy > rect.bottom() {
-            continue;
-        }
-
-        let color = if is_selected {
-            Color::from_rgba(100, 255, 100, 255) // Green when selected/dragging
-        } else if is_hovered {
-            Color::from_rgba(255, 200, 150, 255) // Orange when hovered
-        } else {
-            Color::from_rgba(200, 200, 220, 200) // Default (slightly transparent)
-        };
-
-        let radius = if is_selected || is_hovered { 5.0 } else { 3.0 };
-        draw_circle(sx, sy, radius, color);
-    }
-
     // Draw camera info (position and rotation)
     draw_text(
         &format!(
@@ -904,11 +873,6 @@ pub fn draw_viewport_3d(
         14.0,
         Color::from_rgba(200, 200, 200, 255),
     );
-
-    // Disable scissor rectangle to restore normal rendering
-    unsafe {
-        get_internal_gl().quad_gl.scissor(None);
-    }
 }
 
 /// Draw a 3D line into the framebuffer using Bresenham's algorithm

@@ -61,6 +61,81 @@ impl Framebuffer {
         }
         false
     }
+
+    /// Draw a filled circle at (cx, cy) with given radius and color
+    pub fn draw_circle(&mut self, cx: i32, cy: i32, radius: i32, color: Color) {
+        let r_sq = radius * radius;
+        for y in (cy - radius).max(0)..=(cy + radius).min(self.height as i32 - 1) {
+            for x in (cx - radius).max(0)..=(cx + radius).min(self.width as i32 - 1) {
+                let dx = x - cx;
+                let dy = y - cy;
+                if dx * dx + dy * dy <= r_sq {
+                    self.set_pixel(x as usize, y as usize, color);
+                }
+            }
+        }
+    }
+
+    /// Draw a line from (x0, y0) to (x1, y1) using Bresenham's algorithm
+    pub fn draw_line(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, color: Color) {
+        let dx = (x1 - x0).abs();
+        let dy = -(y1 - y0).abs();
+        let sx = if x0 < x1 { 1 } else { -1 };
+        let sy = if y0 < y1 { 1 } else { -1 };
+        let mut err = dx + dy;
+        let mut x = x0;
+        let mut y = y0;
+
+        loop {
+            if x >= 0 && x < self.width as i32 && y >= 0 && y < self.height as i32 {
+                self.set_pixel(x as usize, y as usize, color);
+            }
+
+            if x == x1 && y == y1 {
+                break;
+            }
+
+            let e2 = 2 * err;
+            if e2 >= dy {
+                err += dy;
+                x += sx;
+            }
+            if e2 <= dx {
+                err += dx;
+                y += sy;
+            }
+        }
+    }
+
+    /// Draw a thick line by drawing multiple parallel lines
+    pub fn draw_thick_line(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, thickness: i32, color: Color) {
+        if thickness <= 1 {
+            self.draw_line(x0, y0, x1, y1, color);
+            return;
+        }
+
+        // Calculate perpendicular offset
+        let dx = (x1 - x0) as f32;
+        let dy = (y1 - y0) as f32;
+        let len = (dx * dx + dy * dy).sqrt();
+        if len < 0.001 {
+            return;
+        }
+
+        let px = -dy / len;
+        let py = dx / len;
+
+        // Draw multiple offset lines
+        let half_thickness = thickness / 2;
+        for i in -half_thickness..=half_thickness {
+            let offset = i as f32;
+            let ox0 = (x0 as f32 + px * offset) as i32;
+            let oy0 = (y0 as f32 + py * offset) as i32;
+            let ox1 = (x1 as f32 + px * offset) as i32;
+            let oy1 = (y1 as f32 + py * offset) as i32;
+            self.draw_line(ox0, oy0, ox1, oy1, color);
+        }
+    }
 }
 
 /// Camera state
