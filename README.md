@@ -1,8 +1,20 @@
 # bonnie-rs
 
-**Mission:** Answer the question "How would a Souls-like have looked on a PS1?"
+**Live Demo:** [https://ebonura.github.io/bonnie-engine](https://ebonura.github.io/bonnie-engine)
 
-A PS1-style software rasterizer engine with an integrated level editor. Everything in this project is tooling to achieve authentic PlayStation 1 aesthetics for a Souls-like experience.
+---
+
+## Mission
+
+Answer the question: **"How would a Souls-like have looked on a PS1?"**
+
+## Core Pillars
+
+1. **Unified Development Environment** - Every tool needed to create the game lives alongside the game itself. The editor, renderer, and game logic are one integrated package.
+
+2. **Cross-Platform First** - Everything runs both in the browser (live demo) and locally (for planned Steam distribution). No compromises on either platform.
+
+3. **Authentic PS1 Aesthetics** - Every feature serves the goal of recreating genuine PlayStation 1 hardware limitations and visual characteristics.
 
 ## Features
 
@@ -107,8 +119,6 @@ cargo build --release --target wasm32-unknown-unknown
 python3 -m http.server 8000
 ```
 
-Live demo: [https://ebonura.github.io/bonnie-engine](https://ebonura.github.io/bonnie-engine)
-
 ## Texture Credits
 
 This project uses the following free texture packs:
@@ -127,27 +137,74 @@ This project uses the following free texture packs:
 
 ## Roadmap
 
-### Core Engine
-- [ ] Sprite/billboard rendering (classic PS1 technique for enemies, items)
-- [ ] Particle system (dust, sparks, blood splatter)
-- [ ] Audio system with sequencer/tracker
-- [ ] Collision detection and physics
-- [ ] Character controller
-
-### Editor
+### Priority: Map Creation & Basic Gameplay
+- [ ] Fix 2D grid placement precision (sectors not aligning to clicks)
 - [ ] Wall tool implementation
 - [ ] Portal creation and room connectivity
 - [ ] Multi-room support
 - [ ] Slope/ramp tools
-- [ ] Lighting system
-- [ ] Entity placement (enemies, items, spawn points)
+- [ ] Collision detection and physics
+- [ ] Character controller (movement, jumping)
+- [ ] Camera system (third-person, lock-on)
 
-### Souls-like Features
+### UI & Settings
+- [ ] Options menu in-game (resolution, PS1 effects toggles)
+- [ ] Editor toolbar: PS1 effects toggles (vertex jitter, affine mapping, etc.)
+- [ ] Resolution selector (240p, 480p, native)
+- [ ] HUD system (health, stamina bars)
+
+### Rendering & Effects
+- [ ] Sprite/billboard rendering (classic PS1 technique for enemies, items)
+- [ ] Particle system (dust, sparks, blood splatter)
+- [ ] Lighting system (vertex colors, dynamic lights)
+- [ ] Fog system (distance-based fade)
+
+### Core Systems
+- [ ] Audio system with sequencer/tracker
+- [ ] Entity system (enemies, items, spawn points)
+- [ ] Inventory system
+- [ ] Save/load game state
+
+### Souls-like Mechanics
 - [ ] Lock-on targeting
-- [ ] Stamina-based combat
-- [ ] Bonfire checkpoints
+- [ ] Stamina-based combat (attacks, dodges, blocks)
+- [ ] Bonfire checkpoints (rest, respawn, level up)
 - [ ] Death/corpse run mechanics
 - [ ] Boss arenas and encounters
+- [ ] Weapon system (durability, movesets)
+- [ ] Estus flask / healing system
+
+### Editor QoL
+- [ ] Copy/paste sectors
+- [ ] Grid snapping toggles
+- [ ] Vertex welding/merging tool
+- [ ] Face splitting/subdividing
+- [ ] Delete tool for faces/vertices
+- [ ] Selection box (drag to select multiple)
+
+### Level Design Features
+- [ ] Water/liquid volumes (with different rendering)
+- [ ] Trigger volumes (for events, cutscenes)
+- [ ] Ladder/climbing surfaces
+- [ ] Moving platforms
+- [ ] Destructible geometry
+- [ ] Skyboxes (PS1-style low-poly or texture-based)
+
+### Enemy/NPC Systems
+- [ ] AI pathfinding
+- [ ] Aggro/detection radius
+- [ ] Attack patterns
+- [ ] Animation state machine
+
+### Performance
+- [ ] Frustum culling optimization
+- [ ] Occlusion culling (beyond portals)
+- [ ] Level streaming for large worlds
+
+### Future Tools (Maybe)
+- [ ] Texture editor integration
+- [ ] Animation tool (for entities/bosses)
+- [ ] Cutscene editor
 
 ## Technical Details
 
