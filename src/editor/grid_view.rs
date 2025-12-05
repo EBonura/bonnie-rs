@@ -319,24 +319,102 @@ pub fn draw_grid_view(ctx: &mut UiContext, rect: Rect, state: &mut EditorState) 
     if inside && !state.grid_panning {
         // Start action on left press
         if ctx.mouse.left_pressed {
-            if let Some(vi) = hovered_vertex {
-                // Vertex has priority - select and start dragging
-                state.selection = Selection::Vertex { room: current_room_idx, vertex: vi };
-                state.grid_dragging_vertex = Some(vi);
-                state.grid_drag_started = false;
-            } else if let Some(fi) = hovered_face {
-                // Face clicked - select it and auto-select its texture
-                state.selection = Selection::Face { room: current_room_idx, face: fi };
+            use super::EditorTool;
 
-                // Auto-select the face's texture in the texture palette
-                if let Some(room) = state.level.rooms.get(current_room_idx) {
-                    if let Some(face) = room.faces.get(fi) {
-                        state.selected_texture = face.texture.clone();
+            match state.tool {
+                EditorTool::Select => {
+                    // Select mode - normal selection behavior
+                    if let Some(vi) = hovered_vertex {
+                        // Vertex has priority - select and start dragging
+                        state.selection = Selection::Vertex { room: current_room_idx, vertex: vi };
+                        state.grid_dragging_vertex = Some(vi);
+                        state.grid_drag_started = false;
+                    } else if let Some(fi) = hovered_face {
+                        // Face clicked - select it and auto-select its texture
+                        state.selection = Selection::Face { room: current_room_idx, face: fi };
+
+                        // Auto-select the face's texture in the texture palette
+                        if let Some(room) = state.level.rooms.get(current_room_idx) {
+                            if let Some(face) = room.faces.get(fi) {
+                                state.selected_texture = face.texture.clone();
+                            }
+                        }
+                    } else {
+                        // Clicked empty space - deselect
+                        state.selection = Selection::None;
                     }
                 }
-            } else {
-                // Clicked empty space - deselect
-                state.selection = Selection::None;
+
+                EditorTool::DrawFloor => {
+                    // Draw floor at clicked position (snap to grid)
+                    if hovered_vertex.is_none() && hovered_face.is_none() {
+                        let wx = (mouse_pos.0 - center_x) / scale;
+                        let wz = -(mouse_pos.1 - center_y) / scale;
+
+                        // Snap to TRLE sector grid
+                        let snapped_x = (wx / SECTOR_SIZE).round() * SECTOR_SIZE;
+                        let snapped_z = (wz / SECTOR_SIZE).round() * SECTOR_SIZE;
+
+                        // Create a new floor quad (1 sector = 1024x1024)
+                        state.save_undo();
+                        if let Some(room) = state.level.rooms.get_mut(current_room_idx) {
+                            use crate::world::FaceType;
+
+                            // Add 4 vertices for the floor quad
+                            let v0 = room.add_vertex(snapped_x, 0.0, snapped_z);
+                            let v1 = room.add_vertex(snapped_x, 0.0, snapped_z + SECTOR_SIZE);
+                            let v2 = room.add_vertex(snapped_x + SECTOR_SIZE, 0.0, snapped_z + SECTOR_SIZE);
+                            let v3 = room.add_vertex(snapped_x + SECTOR_SIZE, 0.0, snapped_z);
+
+                            // Add the floor face with current texture
+                            room.add_quad_textured(v0, v1, v2, v3, state.selected_texture.clone(), FaceType::Floor);
+                            room.recalculate_bounds();
+
+                            state.set_status("Created floor sector", 2.0);
+                        }
+                    }
+                }
+
+                EditorTool::DrawCeiling => {
+                    // Draw ceiling at clicked position (snap to grid)
+                    if hovered_vertex.is_none() && hovered_face.is_none() {
+                        let wx = (mouse_pos.0 - center_x) / scale;
+                        let wz = -(mouse_pos.1 - center_y) / scale;
+
+                        // Snap to TRLE sector grid
+                        let snapped_x = (wx / SECTOR_SIZE).round() * SECTOR_SIZE;
+                        let snapped_z = (wz / SECTOR_SIZE).round() * SECTOR_SIZE;
+
+                        // Create a new ceiling quad at standard height (4 clicks = 1024 units)
+                        state.save_undo();
+                        if let Some(room) = state.level.rooms.get_mut(current_room_idx) {
+                            use crate::world::FaceType;
+
+                            let ceiling_height = 1024.0; // 4 clicks
+
+                            // Add 4 vertices for the ceiling quad (reversed winding for downward-facing normal)
+                            let v0 = room.add_vertex(snapped_x, ceiling_height, snapped_z);
+                            let v1 = room.add_vertex(snapped_x + SECTOR_SIZE, ceiling_height, snapped_z);
+                            let v2 = room.add_vertex(snapped_x + SECTOR_SIZE, ceiling_height, snapped_z + SECTOR_SIZE);
+                            let v3 = room.add_vertex(snapped_x, ceiling_height, snapped_z + SECTOR_SIZE);
+
+                            // Add the ceiling face with current texture
+                            room.add_quad_textured(v0, v1, v2, v3, state.selected_texture.clone(), FaceType::Ceiling);
+                            room.recalculate_bounds();
+
+                            state.set_status("Created ceiling sector", 2.0);
+                        }
+                    }
+                }
+
+                EditorTool::DrawWall => {
+                    // Wall drawing not implemented in 2D view yet
+                    state.set_status("Wall tool: select two vertices in 3D view", 3.0);
+                }
+
+                _ => {
+                    // Other tools not implemented yet
+                }
             }
         }
 
