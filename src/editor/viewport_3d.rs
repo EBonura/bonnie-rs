@@ -168,6 +168,13 @@ pub fn draw_viewport_3d(
         }
     }
 
+    // Toggle link coincident vertices mode with L key
+    if inside_viewport && is_key_pressed(KeyCode::L) {
+        state.link_coincident_vertices = !state.link_coincident_vertices;
+        let mode = if state.link_coincident_vertices { "Linked" } else { "Independent" };
+        state.set_status(&format!("Vertex mode: {}", mode), 2.0);
+    }
+
     // Find vertex under mouse cursor (for picking/dragging)
     let mut hovered_vertex: Option<(usize, usize, f32)> = None; // (room_idx, vertex_idx, screen_dist)
     if inside_viewport && !ctx.mouse.right_down {
@@ -309,14 +316,39 @@ pub fn draw_viewport_3d(
             if let Some((room_idx, vert_idx, _)) = hovered_vertex {
                 // Select and start dragging this vertex
                 state.selection = Selection::Vertex { room: room_idx, vertex: vert_idx };
-                state.viewport_dragging_vertices = vec![(room_idx, vert_idx)];
-                state.viewport_drag_started = false;
 
-                // Store the initial Y height for this vertex
+                // Find all vertices to drag based on link mode
                 if let Some(room) = state.level.rooms.get(room_idx) {
-                    if let Some(vert) = room.vertices.get(vert_idx) {
-                        state.viewport_drag_plane_y = vert.y; // Reference point for delta
-                        state.viewport_drag_initial_y = vec![vert.y];
+                    if let Some(clicked_vert) = room.vertices.get(vert_idx) {
+                        let clicked_pos = clicked_vert;
+
+                        if state.link_coincident_vertices {
+                            // Find ALL vertices at the same position (coincident vertices)
+                            state.viewport_dragging_vertices = room.vertices.iter()
+                                .enumerate()
+                                .filter(|(_, v)| {
+                                    // Check if vertex is at same position (small epsilon for floating point)
+                                    const EPSILON: f32 = 0.001;
+                                    (v.x - clicked_pos.x).abs() < EPSILON &&
+                                    (v.y - clicked_pos.y).abs() < EPSILON &&
+                                    (v.z - clicked_pos.z).abs() < EPSILON
+                                })
+                                .map(|(idx, _)| (room_idx, idx))
+                                .collect();
+
+                            // Store initial Y positions for all coincident vertices
+                            state.viewport_drag_initial_y = state.viewport_dragging_vertices.iter()
+                                .filter_map(|&(_, idx)| room.vertices.get(idx))
+                                .map(|v| v.y)
+                                .collect();
+                        } else {
+                            // Independent mode - only drag the clicked vertex
+                            state.viewport_dragging_vertices = vec![(room_idx, vert_idx)];
+                            state.viewport_drag_initial_y = vec![clicked_pos.y];
+                        }
+
+                        state.viewport_drag_started = false;
+                        state.viewport_drag_plane_y = clicked_pos.y; // Reference point for delta
                     }
                 }
             } else if let Some((room_idx, v0, v1, _)) = hovered_edge {

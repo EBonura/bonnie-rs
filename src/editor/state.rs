@@ -118,6 +118,9 @@ pub struct EditorState {
     pub grid_size: f32, // World units per grid cell
     pub show_grid: bool,
 
+    /// Vertex editing mode
+    pub link_coincident_vertices: bool, // When true, moving a vertex moves all vertices at same position
+
     /// Undo/redo (simple version - just level snapshots)
     pub undo_stack: Vec<Level>,
     pub redo_stack: Vec<Level>,
@@ -181,6 +184,7 @@ impl EditorState {
             grid_zoom: 0.1, // Pixels per world unit (very zoomed out for TRLE 1024-unit sectors)
             grid_size: SECTOR_SIZE, // TRLE sector size
             show_grid: true,
+            link_coincident_vertices: true, // Default to linked mode
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
             dirty: false,
