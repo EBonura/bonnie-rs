@@ -522,18 +522,20 @@ pub fn draw_viewport_3d(
         draw_circle(sx, sy, radius, color);
     }
 
-    // Draw camera info
+    // Draw camera info (position and rotation)
     draw_text(
         &format!(
-            "Cam: ({:.1}, {:.1}, {:.1})",
+            "Cam: ({:.0}, {:.0}, {:.0}) | Rot: ({:.2}, {:.2})",
             state.camera_3d.position.x,
             state.camera_3d.position.y,
-            state.camera_3d.position.z
+            state.camera_3d.position.z,
+            state.camera_3d.rotation_x,
+            state.camera_3d.rotation_y
         ),
         rect.x + 5.0,
         rect.bottom() - 5.0,
-        12.0,
-        Color::from_rgba(150, 150, 150, 255),
+        14.0,
+        Color::from_rgba(200, 200, 200, 255),
     );
 }
 
