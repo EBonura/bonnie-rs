@@ -288,30 +288,36 @@ async fn main() {
                 // Check for pending import from browser (WASM only)
                 #[cfg(target_arch = "wasm32")]
                 {
-                    // Check if import is ready via quad-storage (set by JS in index.html)
-                    if quad_storage::STORAGE.lock().unwrap().get("_bonnie_import_ready") == Some("true".to_string()) {
-                        if let Some(data) = quad_storage::STORAGE.lock().unwrap().get("_bonnie_import_data") {
-                            let filename = quad_storage::STORAGE.lock().unwrap()
-                                .get("_bonnie_import_filename")
-                                .unwrap_or_else(|| "imported.ron".to_string());
+                    extern "C" {
+                        fn bonnie_check_import() -> i32;
+                        fn bonnie_get_import_data() -> sapp_jsutils::JsObject;
+                        fn bonnie_get_import_filename() -> sapp_jsutils::JsObject;
+                        fn bonnie_clear_import();
+                    }
 
-                            // Clear the import flags
-                            {
-                                let mut storage = quad_storage::STORAGE.lock().unwrap();
-                                storage.remove("_bonnie_import_ready");
-                                storage.remove("_bonnie_import_data");
-                                storage.remove("_bonnie_import_filename");
+                    let has_import = unsafe { bonnie_check_import() };
+
+                    if has_import != 0 {
+                        // Get the string data from JS
+                        let data_js = unsafe { bonnie_get_import_data() };
+                        let filename_js = unsafe { bonnie_get_import_filename() };
+
+                        let mut data = String::new();
+                        let mut filename = String::new();
+                        data_js.to_string(&mut data);
+                        filename_js.to_string(&mut filename);
+
+                        // Clear the import data in localStorage
+                        unsafe { bonnie_clear_import(); }
+
+                        // Parse the level data
+                        match ron::from_str::<Level>(&data) {
+                            Ok(level) => {
+                                editor_state = EditorState::with_file(level, PathBuf::from(&filename));
+                                editor_state.set_status(&format!("Uploaded {}", filename), 3.0);
                             }
-
-                            // Parse the level data
-                            match ron::from_str::<Level>(&data) {
-                                Ok(level) => {
-                                    editor_state = EditorState::with_file(level, PathBuf::from(&filename));
-                                    editor_state.set_status(&format!("Imported {}", filename), 3.0);
-                                }
-                                Err(e) => {
-                                    editor_state.set_status(&format!("Import failed: {}", e), 5.0);
-                                }
+                            Err(e) => {
+                                editor_state.set_status(&format!("Upload failed: {}", e), 5.0);
                             }
                         }
                     }
@@ -449,21 +455,18 @@ async fn main() {
                                     .map(|n| n.to_string_lossy().to_string())
                                     .unwrap_or_else(|| "level.ron".to_string());
 
-                                // Pass data to JS using sapp-jsutils
+                                // Pass data to JS using sapp-jsutils and trigger download
+                                extern "C" {
+                                    fn bonnie_download(data: sapp_jsutils::JsObject, filename: sapp_jsutils::JsObject);
+                                }
                                 let data_js = sapp_jsutils::JsObject::string(&ron_str);
                                 let filename_js = sapp_jsutils::JsObject::string(&filename);
-
-                                extern "C" {
-                                    fn bonnie_set_export_data(data: sapp_jsutils::JsObject, filename: sapp_jsutils::JsObject);
-                                    fn bonnie_export_file();
-                                }
                                 unsafe {
-                                    bonnie_set_export_data(data_js, filename_js);
-                                    bonnie_export_file();
+                                    bonnie_download(data_js, filename_js);
                                 }
 
                                 editor_state.dirty = false;
-                                editor_state.set_status(&format!("Exported {}", filename), 3.0);
+                                editor_state.set_status(&format!("Downloaded {}", filename), 3.0);
                             }
                             Err(e) => {
                                 editor_state.set_status(&format!("Export failed: {}", e), 5.0);
