@@ -185,15 +185,18 @@ pub fn draw_viewport_3d(
 
                 // Calculate Y delta from mouse movement (inverted: mouse up = positive Y)
                 let mouse_delta_y = state.viewport_last_mouse.1 - mouse_pos.1;
-                let y_sensitivity = 2.0; // Pixels per world unit
+                let y_sensitivity = 5.0; // Increased sensitivity for better feel
                 let y_delta = mouse_delta_y * y_sensitivity;
 
                 // Update vertex Y position only
                 if let Some(room) = state.level.rooms.get_mut(room_idx) {
                     if let Some(v) = room.vertices.get_mut(vert_idx) {
-                        // Apply delta and snap to CLICK_HEIGHT (256 units)
-                        let new_y = v.y + y_delta;
-                        v.y = (new_y / CLICK_HEIGHT).round() * CLICK_HEIGHT;
+                        // Apply delta directly without snapping during drag
+                        // This allows smooth accumulation of small movements
+                        v.y += y_delta;
+
+                        // Snap to CLICK_HEIGHT grid
+                        v.y = (v.y / CLICK_HEIGHT).round() * CLICK_HEIGHT;
                     }
                 }
             }
