@@ -172,7 +172,7 @@ impl EditorState {
             camera_3d,
             grid_offset_x: 0.0,
             grid_offset_y: 0.0,
-            grid_zoom: 0.3, // Pixels per world unit (more zoomed out for TRLE 1024-unit sectors)
+            grid_zoom: 0.1, // Pixels per world unit (very zoomed out for TRLE 1024-unit sectors)
             grid_size: SECTOR_SIZE, // TRLE sector size
             show_grid: true,
             undo_stack: Vec::new(),

@@ -122,7 +122,7 @@ pub fn draw_viewport_3d(
     state.viewport_last_mouse = mouse_pos;
 
     // Keyboard camera movement (WASD + Q/E) - only when viewport focused and not dragging
-    let move_speed = 0.1;
+    let move_speed = 100.0; // Scaled for TRLE units (1024 per sector)
     if (inside_viewport || state.viewport_mouse_captured) && state.viewport_dragging_vertex.is_none() {
         if is_key_down(KeyCode::W) {
             state.camera_3d.position = state.camera_3d.position + state.camera_3d.basis_z * move_speed;
