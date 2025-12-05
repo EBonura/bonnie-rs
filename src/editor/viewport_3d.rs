@@ -3,8 +3,7 @@
 use macroquad::prelude::*;
 use crate::ui::{Rect, UiContext};
 use crate::rasterizer::{
-    Framebuffer, Texture as RasterTexture, RasterSettings, render_mesh, Color as RasterColor,
-    ray_triangle_intersect, screen_to_ray, Vec3,
+    Framebuffer, Texture as RasterTexture, RasterSettings, render_mesh, Color as RasterColor, Vec3,
 };
 use super::{EditorState, Selection, CLICK_HEIGHT};
 
@@ -40,6 +39,50 @@ fn world_to_screen(
     let sy = (cam_y * us / denom) * vs + (fb_height as f32 / 2.0);
 
     Some((sx, sy))
+}
+
+/// Calculate distance from point to line segment in 2D screen space
+fn point_to_segment_distance(
+    px: f32, py: f32,      // Point
+    x1: f32, y1: f32,      // Segment start
+    x2: f32, y2: f32,      // Segment end
+) -> f32 {
+    let dx = x2 - x1;
+    let dy = y2 - y1;
+    let len_sq = dx * dx + dy * dy;
+
+    if len_sq < 1e-6 {
+        // Segment is essentially a point
+        let pdx = px - x1;
+        let pdy = py - y1;
+        return (pdx * pdx + pdy * pdy).sqrt();
+    }
+
+    // Project point onto line segment
+    let t = ((px - x1) * dx + (py - y1) * dy) / len_sq;
+    let t = t.clamp(0.0, 1.0);
+
+    // Find closest point on segment
+    let closest_x = x1 + t * dx;
+    let closest_y = y1 + t * dy;
+
+    // Distance from point to closest point
+    let dist_x = px - closest_x;
+    let dist_y = py - closest_y;
+    (dist_x * dist_x + dist_y * dist_y).sqrt()
+}
+
+/// Test if point is inside 2D triangle using barycentric coordinates
+fn point_in_triangle_2d(
+    px: f32, py: f32,      // Point
+    x1: f32, y1: f32,      // Triangle v1
+    x2: f32, y2: f32,      // Triangle v2
+    x3: f32, y3: f32,      // Triangle v3
+) -> bool {
+    let area = 0.5 * (-y2 * x3 + y1 * (-x2 + x3) + x1 * (y2 - y3) + x2 * y3);
+    let s = (y1 * x3 - x1 * y3 + (y3 - y1) * px + (x1 - x3) * py) / (2.0 * area);
+    let t = (x1 * y2 - y1 * x2 + (y1 - y2) * px + (x2 - x1) * py) / (2.0 * area);
+    s >= 0.0 && t >= 0.0 && (1.0 - s - t) >= 0.0
 }
 
 /// Draw the 3D viewport using the software rasterizer
@@ -153,9 +196,92 @@ pub fn draw_viewport_3d(
         }
     }
 
-    // Handle vertex selection and dragging
+    // Find edge under mouse cursor (lower priority than vertex)
+    let mut hovered_edge: Option<(usize, usize, usize, f32)> = None; // (room_idx, v0_idx, v1_idx, distance)
+    if inside_viewport && !ctx.mouse.right_down && hovered_vertex.is_none() {
+        if let Some((mouse_fb_x, mouse_fb_y)) = screen_to_fb(mouse_pos.0, mouse_pos.1) {
+            const EDGE_THRESHOLD: f32 = 8.0; // Pixels
+
+            for (room_idx, room) in state.level.rooms.iter().enumerate() {
+                for face in &room.faces {
+                    // Get number of edges (3 for triangle, 4 for quad)
+                    let num_edges = if face.is_triangle { 3 } else { 4 };
+
+                    for i in 0..num_edges {
+                        let v0_idx = face.indices[i];
+                        let v1_idx = face.indices[(i + 1) % num_edges];
+
+                        let v0 = room.vertices[v0_idx] + room.position;
+                        let v1 = room.vertices[v1_idx] + room.position;
+
+                        // Project both vertices to screen
+                        if let (Some((sx0, sy0)), Some((sx1, sy1))) = (
+                            world_to_screen(v0, state.camera_3d.position, state.camera_3d.basis_x,
+                                state.camera_3d.basis_y, state.camera_3d.basis_z, fb.width, fb.height),
+                            world_to_screen(v1, state.camera_3d.position, state.camera_3d.basis_x,
+                                state.camera_3d.basis_y, state.camera_3d.basis_z, fb.width, fb.height)
+                        ) {
+                            let dist = point_to_segment_distance(mouse_fb_x, mouse_fb_y, sx0, sy0, sx1, sy1);
+                            if dist < EDGE_THRESHOLD {
+                                if hovered_edge.map_or(true, |(_, _, _, best_dist)| dist < best_dist) {
+                                    hovered_edge = Some((room_idx, v0_idx, v1_idx, dist));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Find face under mouse cursor (lowest priority)
+    let mut hovered_face: Option<(usize, usize)> = None; // (room_idx, face_idx)
+    if inside_viewport && !ctx.mouse.right_down && hovered_vertex.is_none() && hovered_edge.is_none() {
+        if let Some((mouse_fb_x, mouse_fb_y)) = screen_to_fb(mouse_pos.0, mouse_pos.1) {
+            for (room_idx, room) in state.level.rooms.iter().enumerate() {
+                for (face_idx, face) in room.faces.iter().enumerate() {
+                    // Project all 4 vertices
+                    let v0 = room.vertices[face.indices[0]] + room.position;
+                    let v1 = room.vertices[face.indices[1]] + room.position;
+                    let v2 = room.vertices[face.indices[2]] + room.position;
+                    let v3 = room.vertices[face.indices[3]] + room.position;
+
+                    if let (Some((sx0, sy0)), Some((sx1, sy1)), Some((sx2, sy2)), Some((sx3, sy3))) = (
+                        world_to_screen(v0, state.camera_3d.position, state.camera_3d.basis_x,
+                            state.camera_3d.basis_y, state.camera_3d.basis_z, fb.width, fb.height),
+                        world_to_screen(v1, state.camera_3d.position, state.camera_3d.basis_x,
+                            state.camera_3d.basis_y, state.camera_3d.basis_z, fb.width, fb.height),
+                        world_to_screen(v2, state.camera_3d.position, state.camera_3d.basis_x,
+                            state.camera_3d.basis_y, state.camera_3d.basis_z, fb.width, fb.height),
+                        world_to_screen(v3, state.camera_3d.position, state.camera_3d.basis_x,
+                            state.camera_3d.basis_y, state.camera_3d.basis_z, fb.width, fb.height)
+                    ) {
+                        // Test first triangle (v0, v1, v2)
+                        if point_in_triangle_2d(mouse_fb_x, mouse_fb_y, sx0, sy0, sx1, sy1, sx2, sy2) {
+                            hovered_face = Some((room_idx, face_idx));
+                            break;
+                        }
+
+                        // Test second triangle (v0, v2, v3) if quad
+                        if !face.is_triangle {
+                            if point_in_triangle_2d(mouse_fb_x, mouse_fb_y, sx0, sy0, sx2, sy2, sx3, sy3) {
+                                hovered_face = Some((room_idx, face_idx));
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if hovered_face.is_some() {
+                    break;
+                }
+            }
+        }
+    }
+
+    // Handle selection and dragging based on what's hovered
     if inside_viewport && !ctx.mouse.right_down {
-        // Start dragging on left press
+        // Start dragging or select on left press
         if ctx.mouse.left_pressed {
             if let Some((room_idx, vert_idx, _)) = hovered_vertex {
                 // Select and start dragging this vertex
@@ -169,6 +295,12 @@ pub fn draw_viewport_3d(
                         state.viewport_drag_plane_y = vert.y;
                     }
                 }
+            } else if let Some((room_idx, v0, v1, _)) = hovered_edge {
+                // Select edge
+                state.selection = Selection::Edge { room: room_idx, v0, v1 };
+            } else if let Some((room_idx, face_idx)) = hovered_face {
+                // Select face
+                state.selection = Selection::Face { room: room_idx, face: face_idx };
             }
         }
 
@@ -214,61 +346,6 @@ pub fn draw_viewport_3d(
 
             state.viewport_dragging_vertex = None;
             state.viewport_drag_started = false;
-        }
-    }
-
-    // Face picking on left-click (only if not clicking a vertex)
-    if ctx.mouse.clicked(&rect) && !ctx.mouse.right_down && hovered_vertex.is_none() {
-        if let Some((fb_x, fb_y)) = screen_to_fb(mouse_pos.0, mouse_pos.1) {
-            // Cast ray from camera
-            let (ray_origin, ray_dir) = screen_to_ray(
-                fb_x,
-                fb_y,
-                fb.width,
-                fb.height,
-                state.camera_3d.position,
-                state.camera_3d.basis_x,
-                state.camera_3d.basis_y,
-                state.camera_3d.basis_z,
-            );
-
-            // Test ray against all room faces
-            let mut best_hit: Option<(usize, usize, f32)> = None;
-
-            for (room_idx, room) in state.level.rooms.iter().enumerate() {
-                for (face_idx, face) in room.faces.iter().enumerate() {
-                    let v0 = room.vertices[face.indices[0]] + room.position;
-                    let v1 = room.vertices[face.indices[1]] + room.position;
-                    let v2 = room.vertices[face.indices[2]] + room.position;
-                    let v3 = room.vertices[face.indices[3]] + room.position;
-
-                    if let Some(t) = ray_triangle_intersect(ray_origin, ray_dir, v0, v1, v2) {
-                        if best_hit.map_or(true, |(_, _, best_t)| t < best_t) {
-                            best_hit = Some((room_idx, face_idx, t));
-                        }
-                    }
-
-                    if !face.is_triangle {
-                        if let Some(t) = ray_triangle_intersect(ray_origin, ray_dir, v0, v2, v3) {
-                            if best_hit.map_or(true, |(_, _, best_t)| t < best_t) {
-                                best_hit = Some((room_idx, face_idx, t));
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Select face and apply texture
-            if let Some((room_idx, face_idx, _)) = best_hit {
-                state.selection = Selection::Face { room: room_idx, face: face_idx };
-                let texture_id = state.selected_texture;
-                state.save_undo();
-                if let Some(room) = state.level.rooms.get_mut(room_idx) {
-                    if let Some(face) = room.faces.get_mut(face_idx) {
-                        face.texture_id = texture_id;
-                    }
-                }
-            }
         }
     }
 
@@ -459,6 +536,56 @@ pub fn draw_viewport_3d(
         for (fx, fy) in &screen_verts {
             let (sx, sy) = fb_to_screen(*fx, *fy);
             draw_circle(sx, sy, 4.0, highlight_color);
+        }
+    }
+
+    // Draw hovered edge highlight
+    if let Some((room_idx, v0_idx, v1_idx, _)) = hovered_edge {
+        if let Some(room) = state.level.rooms.get(room_idx) {
+            let v0 = room.vertices[v0_idx] + room.position;
+            let v1 = room.vertices[v1_idx] + room.position;
+
+            if let (Some((sx0, sy0)), Some((sx1, sy1))) = (
+                world_to_screen(v0, state.camera_3d.position, state.camera_3d.basis_x,
+                    state.camera_3d.basis_y, state.camera_3d.basis_z, fb.width, fb.height),
+                world_to_screen(v1, state.camera_3d.position, state.camera_3d.basis_x,
+                    state.camera_3d.basis_y, state.camera_3d.basis_z, fb.width, fb.height)
+            ) {
+                let (screen_x0, screen_y0) = fb_to_screen(sx0, sy0);
+                let (screen_x1, screen_y1) = fb_to_screen(sx1, sy1);
+                draw_line(screen_x0, screen_y0, screen_x1, screen_y1, 3.0, Color::from_rgba(255, 200, 100, 255));
+            }
+        }
+    }
+
+    // Draw hovered face highlight
+    if let Some((room_idx, face_idx)) = hovered_face {
+        if let Some(room) = state.level.rooms.get(room_idx) {
+            if let Some(face) = room.faces.get(face_idx) {
+                let num_verts = if face.is_triangle { 3 } else { 4 };
+                let mut screen_verts = Vec::new();
+
+                for i in 0..num_verts {
+                    let v = room.vertices[face.indices[i]] + room.position;
+                    if let Some((sx, sy)) = world_to_screen(v, state.camera_3d.position,
+                        state.camera_3d.basis_x, state.camera_3d.basis_y, state.camera_3d.basis_z,
+                        fb.width, fb.height)
+                    {
+                        let (screen_x, screen_y) = fb_to_screen(sx, sy);
+                        screen_verts.push((screen_x, screen_y));
+                    }
+                }
+
+                // Draw semi-transparent overlay
+                if screen_verts.len() >= 3 {
+                    // Draw edges
+                    for i in 0..screen_verts.len() {
+                        let (x0, y0) = screen_verts[i];
+                        let (x1, y1) = screen_verts[(i + 1) % screen_verts.len()];
+                        draw_line(x0, y0, x1, y1, 2.0, Color::from_rgba(150, 200, 255, 200));
+                    }
+                }
+            }
         }
     }
 
