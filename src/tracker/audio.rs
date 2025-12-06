@@ -295,6 +295,57 @@ impl AudioEngine {
         }
     }
 
+    /// Set pitch bend (0-16383, center = 8192)
+    pub fn set_pitch_bend(&self, channel: i32, value: i32) {
+        let mut state = self.state.lock().unwrap();
+        if let Some(ref mut synth) = state.synth {
+            // Pitch bend is 0xE0, with LSB and MSB as the two data bytes
+            let lsb = value & 0x7F;
+            let msb = (value >> 7) & 0x7F;
+            synth.process_midi_message(channel, 0xE0, lsb, msb);
+        }
+    }
+
+    /// Set modulation wheel (CC 1)
+    pub fn set_modulation(&self, channel: i32, value: i32) {
+        let mut state = self.state.lock().unwrap();
+        if let Some(ref mut synth) = state.synth {
+            synth.process_midi_message(channel, 0xB0, 1, value.clamp(0, 127));
+        }
+    }
+
+    /// Set expression (CC 11)
+    pub fn set_expression(&self, channel: i32, value: i32) {
+        let mut state = self.state.lock().unwrap();
+        if let Some(ref mut synth) = state.synth {
+            synth.process_midi_message(channel, 0xB0, 11, value.clamp(0, 127));
+        }
+    }
+
+    /// Set reverb send (CC 91)
+    pub fn set_reverb(&self, channel: i32, value: i32) {
+        let mut state = self.state.lock().unwrap();
+        if let Some(ref mut synth) = state.synth {
+            synth.process_midi_message(channel, 0xB0, 91, value.clamp(0, 127));
+        }
+    }
+
+    /// Set chorus send (CC 93)
+    pub fn set_chorus(&self, channel: i32, value: i32) {
+        let mut state = self.state.lock().unwrap();
+        if let Some(ref mut synth) = state.synth {
+            synth.process_midi_message(channel, 0xB0, 93, value.clamp(0, 127));
+        }
+    }
+
+    /// Reset all controllers on a channel
+    pub fn reset_controllers(&self, channel: i32) {
+        let mut state = self.state.lock().unwrap();
+        if let Some(ref mut synth) = state.synth {
+            synth.reset_all_controllers_channel(channel);
+        }
+    }
+
     /// Get list of preset names from the loaded soundfont
     pub fn get_preset_names(&self) -> Vec<(u8, u8, String)> {
         let gm_names = [

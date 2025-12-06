@@ -222,7 +222,7 @@ async fn main() {
                 app.tracker.update_playback(delta);
 
                 // Draw tracker UI
-                tracker::draw_tracker(&mut ui_ctx, content_rect, &mut app.tracker);
+                tracker::draw_tracker(&mut ui_ctx, content_rect, &mut app.tracker, app.icon_font.as_ref());
             }
         }
 

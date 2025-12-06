@@ -82,8 +82,11 @@ impl Default for Note {
     }
 }
 
-/// Number of channels in the tracker
-pub const NUM_CHANNELS: usize = 8;
+/// Maximum number of channels
+pub const MAX_CHANNELS: usize = 8;
+
+/// Default number of channels
+pub const DEFAULT_CHANNELS: usize = 4;
 
 /// Default pattern length (rows)
 pub const DEFAULT_PATTERN_LEN: usize = 64;
@@ -99,11 +102,35 @@ pub struct Pattern {
 
 impl Pattern {
     pub fn new(length: usize) -> Self {
+        Self::with_channels(length, DEFAULT_CHANNELS)
+    }
+
+    pub fn with_channels(length: usize, num_channels: usize) -> Self {
         let len = length.min(256);
+        let ch_count = num_channels.clamp(1, MAX_CHANNELS);
         Self {
             length: len,
-            channels: vec![vec![Note::EMPTY; len]; NUM_CHANNELS],
+            channels: vec![vec![Note::EMPTY; len]; ch_count],
         }
+    }
+
+    /// Add a channel to this pattern
+    pub fn add_channel(&mut self) {
+        if self.channels.len() < MAX_CHANNELS {
+            self.channels.push(vec![Note::EMPTY; self.length]);
+        }
+    }
+
+    /// Remove the last channel from this pattern
+    pub fn remove_channel(&mut self) {
+        if self.channels.len() > 1 {
+            self.channels.pop();
+        }
+    }
+
+    /// Get the number of channels
+    pub fn num_channels(&self) -> usize {
+        self.channels.len()
     }
 
     /// Get a note at a specific position
@@ -142,6 +169,8 @@ pub struct Song {
     pub arrangement: Vec<usize>,
     /// Instrument names (for display)
     pub instrument_names: Vec<String>,
+    /// Per-channel instrument (GM program number 0-127)
+    pub channel_instruments: Vec<u8>,
 }
 
 impl Song {
@@ -153,7 +182,47 @@ impl Song {
             patterns: vec![Pattern::default()],
             arrangement: vec![0],
             instrument_names: Vec::new(),
+            channel_instruments: vec![0; DEFAULT_CHANNELS], // Piano for all channels
         }
+    }
+
+    /// Get the number of channels in this song
+    pub fn num_channels(&self) -> usize {
+        self.channel_instruments.len()
+    }
+
+    /// Add a channel to the song
+    pub fn add_channel(&mut self) {
+        if self.channel_instruments.len() < MAX_CHANNELS {
+            self.channel_instruments.push(0); // Default to piano
+            // Also add channel to all patterns
+            for pattern in &mut self.patterns {
+                pattern.add_channel();
+            }
+        }
+    }
+
+    /// Remove the last channel from the song
+    pub fn remove_channel(&mut self) {
+        if self.channel_instruments.len() > 1 {
+            self.channel_instruments.pop();
+            // Also remove channel from all patterns
+            for pattern in &mut self.patterns {
+                pattern.remove_channel();
+            }
+        }
+    }
+
+    /// Set instrument for a channel
+    pub fn set_channel_instrument(&mut self, channel: usize, instrument: u8) {
+        if let Some(inst) = self.channel_instruments.get_mut(channel) {
+            *inst = instrument;
+        }
+    }
+
+    /// Get instrument for a channel
+    pub fn get_channel_instrument(&self, channel: usize) -> u8 {
+        self.channel_instruments.get(channel).copied().unwrap_or(0)
     }
 
     /// Get the current pattern being edited
@@ -185,20 +254,20 @@ impl Default for Song {
     }
 }
 
-/// Effect commands (similar to MOD/XM trackers)
+/// Effect commands (similar to MOD/XM trackers + MIDI effects)
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Effect {
     /// No effect
     None,
-    /// Arpeggio (0xy)
+    /// Arpeggio (0xy) - rapid note switching
     Arpeggio(u8, u8),
-    /// Slide up (1xx)
+    /// Slide up (1xx) - pitch bend up
     SlideUp(u8),
-    /// Slide down (2xx)
+    /// Slide down (2xx) - pitch bend down
     SlideDown(u8),
     /// Portamento to note (3xx)
     Portamento(u8),
-    /// Vibrato (4xy)
+    /// Vibrato (4xy) - modulation wheel
     Vibrato(u8, u8),
     /// Volume slide (Axy)
     VolumeSlide(u8, u8),
@@ -206,8 +275,18 @@ pub enum Effect {
     SetVolume(u8),
     /// Pattern break (Dxx)
     PatternBreak(u8),
-    /// Set speed (Fxx)
+    /// Set speed/BPM (Fxx)
     SetSpeed(u8),
+    /// Set pan (Pxx) - 00=left, 40=center, 7F=right
+    SetPan(u8),
+    /// Reverb send (Rxx) - 00-7F
+    SetReverb(u8),
+    /// Chorus send (Hxx) - 00-7F
+    SetChorus(u8),
+    /// Expression (Exx) - volume expression 00-7F
+    SetExpression(u8),
+    /// Modulation (Mxx) - mod wheel 00-7F
+    SetModulation(u8),
 }
 
 impl Effect {
@@ -222,8 +301,55 @@ impl Effect {
             'A' => Effect::VolumeSlide(param >> 4, param & 0x0F),
             'C' => Effect::SetVolume(param),
             'D' => Effect::PatternBreak(param),
+            'E' => Effect::SetExpression(param),
             'F' => Effect::SetSpeed(param),
+            'H' => Effect::SetChorus(param),
+            'M' => Effect::SetModulation(param),
+            'P' => Effect::SetPan(param),
+            'R' => Effect::SetReverb(param),
             _ => Effect::None,
+        }
+    }
+
+    /// Get the effect character code
+    pub fn to_char(&self) -> Option<char> {
+        match self {
+            Effect::None => None,
+            Effect::Arpeggio(_, _) => Some('0'),
+            Effect::SlideUp(_) => Some('1'),
+            Effect::SlideDown(_) => Some('2'),
+            Effect::Portamento(_) => Some('3'),
+            Effect::Vibrato(_, _) => Some('4'),
+            Effect::VolumeSlide(_, _) => Some('A'),
+            Effect::SetVolume(_) => Some('C'),
+            Effect::PatternBreak(_) => Some('D'),
+            Effect::SetExpression(_) => Some('E'),
+            Effect::SetSpeed(_) => Some('F'),
+            Effect::SetChorus(_) => Some('H'),
+            Effect::SetModulation(_) => Some('M'),
+            Effect::SetPan(_) => Some('P'),
+            Effect::SetReverb(_) => Some('R'),
+        }
+    }
+
+    /// Get the effect parameter
+    pub fn param(&self) -> u8 {
+        match self {
+            Effect::None => 0,
+            Effect::Arpeggio(x, y) => (x << 4) | y,
+            Effect::SlideUp(p) => *p,
+            Effect::SlideDown(p) => *p,
+            Effect::Portamento(p) => *p,
+            Effect::Vibrato(x, y) => (x << 4) | y,
+            Effect::VolumeSlide(x, y) => (x << 4) | y,
+            Effect::SetVolume(v) => *v,
+            Effect::PatternBreak(r) => *r,
+            Effect::SetExpression(v) => *v,
+            Effect::SetSpeed(s) => *s,
+            Effect::SetChorus(v) => *v,
+            Effect::SetModulation(v) => *v,
+            Effect::SetPan(p) => *p,
+            Effect::SetReverb(v) => *v,
         }
     }
 }

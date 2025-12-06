@@ -15,21 +15,27 @@ pub mod icon {
     pub const UNDO: char = '\u{e19b}';
     pub const REDO: char = '\u{e143}';
 
-    // Playback
+    // Playback / Transport
     pub const PLAY: char = '\u{e13c}';
+    pub const PAUSE: char = '\u{e131}';
+    pub const SQUARE: char = '\u{e167}';      // Stop (also used as shape)
+    pub const SKIP_BACK: char = '\u{e15f}';   // Rewind to start
+    pub const SKIP_FORWARD: char = '\u{e160}';
 
     // UI / Navigation
     pub const PLUS: char = '\u{e13d}';
+    pub const MINUS: char = '\u{e11c}';
     pub const MOVE: char = '\u{e121}';
     pub const CIRCLE_CHEVRON_LEFT: char = '\u{e4de}';
     pub const CIRCLE_CHEVRON_RIGHT: char = '\u{e4df}';
+    pub const CHEVRON_UP: char = '\u{e071}';
+    pub const CHEVRON_DOWN: char = '\u{e06e}';
 
     // Link/Unlink (for vertex mode)
     pub const LINK: char = '\u{e104}';
     pub const UNLINK: char = '\u{e19a}';
 
     // Editor tools
-    pub const SQUARE: char = '\u{e167}';
     pub const BOX: char = '\u{e061}';
     pub const LAYERS: char = '\u{e529}';
     pub const GRID: char = '\u{e0e9}';
@@ -39,6 +45,11 @@ pub mod icon {
     pub const MAGNET: char = '\u{e2b5}';      // Vertex snapping (jitter)
     pub const MONITOR: char = '\u{e11d}';     // Low resolution mode
     pub const SUN: char = '\u{e178}';         // Lighting/shading
+
+    // Music editor
+    pub const MUSIC: char = '\u{e127}';       // Music/notes
+    pub const PIANO: char = '\u{e2ea}';       // Piano (keyboard icon)
+    pub const LIST_MUSIC: char = '\u{e10b}';  // Arrangement/playlist
 }
 
 /// Draw a Lucide icon centered in a rect
