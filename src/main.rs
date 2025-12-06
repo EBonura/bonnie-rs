@@ -15,6 +15,7 @@ mod world;
 mod ui;
 mod editor;
 mod landing;
+mod tracker;
 mod app;
 
 use macroquad::prelude::*;
@@ -220,7 +221,12 @@ async fn main() {
             }
 
             Tool::Tracker => {
-                draw_placeholder(content_rect, "Tracker", Color::from_rgba(30, 25, 35, 255));
+                // Update playback timing
+                let delta = get_frame_time() as f64;
+                app.tracker.update_playback(delta);
+
+                // Draw tracker UI
+                tracker::draw_tracker(&mut ui_ctx, content_rect, &mut app.tracker);
             }
 
             Tool::Game => {

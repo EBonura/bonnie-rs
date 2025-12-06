@@ -5,6 +5,7 @@
 
 use crate::editor::{EditorState, EditorLayout};
 use crate::landing::LandingState;
+use crate::tracker::TrackerState;
 use crate::world::Level;
 use macroquad::prelude::Font;
 use std::path::PathBuf;
@@ -64,10 +65,7 @@ pub struct SoundDesignerState {
     // TODO: Add sound designer state
 }
 
-/// State for Tracker (placeholder)
-pub struct TrackerState {
-    // TODO: Add tracker state
-}
+// TrackerState is now imported from crate::tracker
 
 /// State for Game preview (placeholder)
 pub struct GameState {
@@ -115,7 +113,7 @@ impl AppState {
                 editor_layout: EditorLayout::new(),
             },
             sound_designer: SoundDesignerState {},
-            tracker: TrackerState {},
+            tracker: TrackerState::new(),
             game: GameState {},
             icon_font,
         }

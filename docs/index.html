@@ -190,6 +190,45 @@
         };
 
         // =============================================================================
+        // Soundfont Cache (fetch raw bytes for SF2 playback)
+        // =============================================================================
+
+        var SoundfontCache = {
+            data: null,
+            loaded: false,
+            path: 'assets/soundfonts/TimGM6mb.sf2',
+
+            isLoaded: function() {
+                return SoundfontCache.loaded ? 1 : 0;
+            },
+
+            getSize: function() {
+                return SoundfontCache.data ? SoundfontCache.data.length : 0;
+            },
+
+            copyData: function(destPtr, maxLen) {
+                if (!SoundfontCache.data) return 0;
+                return writeWasmBytes(destPtr, SoundfontCache.data, maxLen);
+            },
+
+            prefetch: async function() {
+                try {
+                    var response = await fetch(SoundfontCache.path);
+                    if (!response.ok) {
+                        console.warn('Soundfont not found:', SoundfontCache.path);
+                        return;
+                    }
+                    var buffer = await response.arrayBuffer();
+                    SoundfontCache.data = new Uint8Array(buffer);
+                    SoundfontCache.loaded = true;
+                    console.log('Soundfont loaded:', SoundfontCache.data.length, 'bytes');
+                } catch (err) {
+                    console.warn('Failed to load soundfont:', err);
+                }
+            }
+        };
+
+        // =============================================================================
         // Texture Cache (parallel prefetch + native PNG decoding)
         // =============================================================================
 
@@ -316,6 +355,11 @@
                 env.bonnie_is_prefetch_complete = TextureCache.isComplete;
                 env.bonnie_get_cached_texture_info = TextureCache.getInfo;
                 env.bonnie_copy_cached_texture = TextureCache.copyData;
+
+                // Soundfont cache
+                env.bonnie_is_soundfont_loaded = SoundfontCache.isLoaded;
+                env.bonnie_get_soundfont_size = SoundfontCache.getSize;
+                env.bonnie_copy_soundfont = SoundfontCache.copyData;
             }
         });
 
@@ -323,7 +367,11 @@
         // Startup
         // =============================================================================
 
-        TextureCache.prefetchAll().then(function() {
+        // Prefetch textures and soundfont in parallel, then start WASM
+        Promise.all([
+            TextureCache.prefetchAll(),
+            SoundfontCache.prefetch()
+        ]).then(function() {
             load('bonnie-engine.wasm');
         });
 
