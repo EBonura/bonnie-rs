@@ -248,6 +248,41 @@
         };
 
         // =============================================================================
+        // Asset Loading Progress (shared across textures and soundfont)
+        // =============================================================================
+
+        var AssetLoader = {
+            total: 0,
+            loaded: 0,
+
+            reset: function() {
+                AssetLoader.total = 0;
+                AssetLoader.loaded = 0;
+            },
+
+            addTotal: function(count) {
+                AssetLoader.total += count;
+            },
+
+            increment: function() {
+                AssetLoader.loaded++;
+                AssetLoader.updateBar();
+            },
+
+            updateBar: function() {
+                var barEl = document.getElementById('loading-bar');
+                if (barEl && AssetLoader.total > 0) {
+                    barEl.style.width = (AssetLoader.loaded / AssetLoader.total * 100) + '%';
+                }
+            },
+
+            setStatus: function(msg) {
+                var statusEl = document.getElementById('loading-status');
+                if (statusEl) statusEl.textContent = msg;
+            }
+        };
+
+        // =============================================================================
         // Soundfont Cache (fetch raw bytes for SF2 playback)
         // =============================================================================
 
@@ -270,18 +305,22 @@
             },
 
             prefetch: async function() {
+                AssetLoader.addTotal(1); // Count soundfont as 1 asset
                 try {
                     var response = await fetch(SoundfontCache.path);
                     if (!response.ok) {
                         console.warn('Soundfont not found:', SoundfontCache.path);
+                        AssetLoader.increment();
                         return;
                     }
                     var buffer = await response.arrayBuffer();
                     SoundfontCache.data = new Uint8Array(buffer);
                     SoundfontCache.loaded = true;
+                    AssetLoader.increment();
                     console.log('Soundfont loaded:', SoundfontCache.data.length, 'bytes');
                 } catch (err) {
                     console.warn('Failed to load soundfont:', err);
+                    AssetLoader.increment();
                 }
             }
         };
@@ -337,10 +376,7 @@
             },
 
             prefetchAll: async function() {
-                var statusEl = document.getElementById('loading-status');
-                var barEl = document.getElementById('loading-bar');
-
-                if (statusEl) statusEl.textContent = 'Loading manifest...';
+                AssetLoader.setStatus('Loading manifest...');
 
                 try {
                     var manifest = await (await fetch('assets/textures/manifest.txt')).text();
@@ -359,7 +395,8 @@
                     });
 
                     TextureCache.total = paths.length;
-                    if (statusEl) statusEl.textContent = 'Loading ' + paths.length + ' textures...';
+                    AssetLoader.addTotal(paths.length);
+                    AssetLoader.setStatus('Loading assets...');
 
                     // Fetch and decode all in parallel
                     await Promise.all(paths.map(function(path) {
@@ -369,13 +406,16 @@
                             .then(function(decoded) {
                                 TextureCache.cache[path] = decoded;
                                 TextureCache.loaded++;
-                                if (barEl) barEl.style.width = (TextureCache.loaded / TextureCache.total * 100) + '%';
+                                AssetLoader.increment();
                             })
-                            .catch(function() { TextureCache.loaded++; });
+                            .catch(function() {
+                                TextureCache.loaded++;
+                                AssetLoader.increment();
+                            });
                     }));
 
                     TextureCache.complete = true;
-                    if (statusEl) statusEl.textContent = 'Starting engine...';
+                    AssetLoader.setStatus('Starting engine...');
 
                 } catch (err) {
                     console.error('Prefetch failed:', err);
