@@ -33,6 +33,12 @@ pub mod icon {
     pub const BOX: char = '\u{e061}';
     pub const LAYERS: char = '\u{e529}';
     pub const GRID: char = '\u{e0e9}';
+
+    // PS1 effect toggles
+    pub const WAVES: char = '\u{e283}';       // Affine texture mapping (warpy)
+    pub const MAGNET: char = '\u{e2b5}';      // Vertex snapping (jitter)
+    pub const MONITOR: char = '\u{e11d}';     // Low resolution mode
+    pub const SUN: char = '\u{e178}';         // Lighting/shading
 }
 
 /// Draw a Lucide icon centered in a rect

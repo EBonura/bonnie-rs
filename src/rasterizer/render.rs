@@ -3,7 +3,6 @@
 
 use super::math::{barycentric, perspective_transform, project, Vec3};
 use super::types::{Color, Face, RasterSettings, ShadingMode, Texture, Vertex};
-use super::{HEIGHT, WIDTH};
 
 /// Framebuffer for software rendering
 pub struct Framebuffer {
@@ -20,6 +19,15 @@ impl Framebuffer {
             zbuffer: vec![f32::MAX; width * height],
             width,
             height,
+        }
+    }
+
+    pub fn resize(&mut self, width: usize, height: usize) {
+        if self.width != width || self.height != height {
+            self.width = width;
+            self.height = height;
+            self.pixels = vec![0; width * height * 4];
+            self.zbuffer = vec![f32::MAX; width * height];
         }
     }
 

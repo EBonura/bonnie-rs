@@ -2,7 +2,7 @@
 
 use macroquad::prelude::*;
 use crate::ui::{Rect, UiContext, SplitPanel, draw_panel, panel_content_rect, Toolbar, icon};
-use crate::rasterizer::{Framebuffer, Texture as RasterTexture, RasterSettings};
+use crate::rasterizer::{Framebuffer, Texture as RasterTexture};
 use super::{EditorState, EditorTool};
 use super::grid_view::draw_grid_view;
 use super::viewport_3d::draw_viewport_3d;
@@ -71,7 +71,6 @@ pub fn draw_editor(
     state: &mut EditorState,
     textures: &[RasterTexture],
     fb: &mut Framebuffer,
-    settings: &RasterSettings,
     bounds: Rect,
     icon_font: Option<&Font>,
 ) -> EditorAction {
@@ -110,7 +109,7 @@ pub fn draw_editor(
     draw_room_properties(ctx, panel_content_rect(room_props_rect, true), state);
 
     draw_panel(center_rect, Some("3D Viewport"), Color::from_rgba(25, 25, 30, 255));
-    draw_viewport_3d(ctx, panel_content_rect(center_rect, true), state, textures, fb, settings);
+    draw_viewport_3d(ctx, panel_content_rect(center_rect, true), state, textures, fb);
 
     draw_panel(texture_rect, Some("Textures"), Color::from_rgba(35, 35, 40, 255));
     draw_texture_palette(ctx, panel_content_rect(texture_rect, true), state, icon_font);
@@ -219,6 +218,35 @@ fn draw_unified_toolbar(ctx: &mut UiContext, rect: Rect, state: &mut EditorState
     if toolbar.icon_button(ctx, icon::PLUS, icon_font, "Add Room") {
         // TODO: Add new room
         println!("Add room clicked");
+    }
+
+    toolbar.separator();
+
+    // PS1 effect toggles
+    if toolbar.icon_button_active(ctx, icon::WAVES, icon_font, "Affine Textures (PS1 warp)", state.raster_settings.affine_textures) {
+        state.raster_settings.affine_textures = !state.raster_settings.affine_textures;
+        let mode = if state.raster_settings.affine_textures { "ON" } else { "OFF" };
+        state.set_status(&format!("Affine textures: {}", mode), 2.0);
+    }
+    if toolbar.icon_button_active(ctx, icon::MAGNET, icon_font, "Vertex Snap (PS1 jitter)", state.raster_settings.vertex_snap) {
+        state.raster_settings.vertex_snap = !state.raster_settings.vertex_snap;
+        let mode = if state.raster_settings.vertex_snap { "ON" } else { "OFF" };
+        state.set_status(&format!("Vertex snap: {}", mode), 2.0);
+    }
+    if toolbar.icon_button_active(ctx, icon::SUN, icon_font, "Gouraud Shading", state.raster_settings.shading != crate::rasterizer::ShadingMode::None) {
+        use crate::rasterizer::ShadingMode;
+        state.raster_settings.shading = if state.raster_settings.shading == ShadingMode::None {
+            ShadingMode::Gouraud
+        } else {
+            ShadingMode::None
+        };
+        let mode = if state.raster_settings.shading != ShadingMode::None { "ON" } else { "OFF" };
+        state.set_status(&format!("Shading: {}", mode), 2.0);
+    }
+    if toolbar.icon_button_active(ctx, icon::MONITOR, icon_font, "Low Resolution (PS1 320x240)", state.raster_settings.low_resolution) {
+        state.raster_settings.low_resolution = !state.raster_settings.low_resolution;
+        let mode = if state.raster_settings.low_resolution { "320x240" } else { "High-res" };
+        state.set_status(&format!("Resolution: {}", mode), 2.0);
     }
 
     toolbar.separator();

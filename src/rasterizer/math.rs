@@ -110,6 +110,8 @@ pub fn perspective_transform(v: Vec3, cam_x: Vec3, cam_y: Vec3, cam_z: Vec3) -> 
 
 /// Project a 3D point to 2D screen coordinates
 /// If `snap` is true, coordinates are floored to integers (PS1 jitter effect)
+/// Returns Vec3 where x,y are screen coords and z is the ORIGINAL camera-space depth
+/// (needed for perspective-correct texture interpolation)
 pub fn project(v: Vec3, snap: bool, width: usize, height: usize) -> Vec3 {
     const DISTANCE: f32 = 5.0;
     const SCALE: f32 = 0.75;
@@ -121,19 +123,19 @@ pub fn project(v: Vec3, snap: bool, width: usize, height: usize) -> Vec3 {
     // Perspective divide
     let denom = v.z + ud;
     if denom.abs() < 0.001 {
-        return Vec3::new(width as f32 / 2.0, height as f32 / 2.0, DISTANCE);
+        return Vec3::new(width as f32 / 2.0, height as f32 / 2.0, v.z);
     }
 
     let mut result = Vec3 {
         x: (v.x * us) / denom,
         y: (v.y * us) / denom,
-        z: (v.z * us) / denom,
+        z: v.z, // Store ORIGINAL camera-space Z for perspective-correct interpolation
     };
 
     // Scale to screen
     result.x = result.x * vs + (width as f32 / 2.0);
     result.y = result.y * vs + (height as f32 / 2.0);
-    result.z = result.z + DISTANCE;
+    // z stays as original camera-space depth
 
     // PS1 vertex snapping
     if snap {

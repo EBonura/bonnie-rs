@@ -3,8 +3,8 @@
 use macroquad::prelude::*;
 use crate::ui::{Rect, UiContext};
 use crate::rasterizer::{
-    Framebuffer, Texture as RasterTexture, RasterSettings, render_mesh, Color as RasterColor, Vec3,
-    perspective_transform,
+    Framebuffer, Texture as RasterTexture, render_mesh, Color as RasterColor, Vec3,
+    perspective_transform, WIDTH, HEIGHT, WIDTH_HI, HEIGHT_HI,
 };
 use super::{EditorState, Selection, CLICK_HEIGHT};
 
@@ -93,8 +93,15 @@ pub fn draw_viewport_3d(
     state: &mut EditorState,
     textures: &[RasterTexture],
     fb: &mut Framebuffer,
-    settings: &RasterSettings,
 ) {
+    // Resize framebuffer based on resolution setting
+    let (target_w, target_h) = if state.raster_settings.low_resolution {
+        (WIDTH, HEIGHT)
+    } else {
+        (WIDTH_HI, HEIGHT_HI)
+    };
+    fb.resize(target_w, target_h);
+
     let mouse_pos = (ctx.mouse.x, ctx.mouse.y);
     let inside_viewport = ctx.mouse.inside(&rect);
 
@@ -796,6 +803,7 @@ pub fn draw_viewport_3d(
     };
 
     // Render all rooms
+    let settings = &state.raster_settings;
     for room in &state.level.rooms {
         let (vertices, faces) = room.to_render_data_with_textures(&resolve_texture);
         render_mesh(fb, &vertices, &faces, textures, &state.camera_3d, settings);

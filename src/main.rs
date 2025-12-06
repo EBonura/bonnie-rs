@@ -18,7 +18,7 @@ mod landing;
 mod app;
 
 use macroquad::prelude::*;
-use rasterizer::{Framebuffer, RasterSettings, Texture, HEIGHT, WIDTH};
+use rasterizer::{Framebuffer, Texture, HEIGHT, WIDTH};
 use world::{create_empty_level, load_level, save_level};
 use ui::{UiContext, MouseState, Rect, draw_fixed_tabs, layout as tab_layout};
 use editor::{EditorAction, draw_editor};
@@ -69,9 +69,6 @@ async fn main() {
             loaded
         }
     };
-
-    // Rasterizer settings
-    let settings = RasterSettings::default();
 
     // Mouse state tracking
     let mut last_left_down = false;
@@ -210,7 +207,6 @@ async fn main() {
                     &mut ws.editor_state,
                     &editor_textures,
                     &mut fb,
-                    &settings,
                     content_rect,
                     app.icon_font.as_ref(),
                 );

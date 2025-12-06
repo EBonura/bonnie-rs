@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 use crate::world::Level;
-use crate::rasterizer::{Camera, Vec3, Texture};
+use crate::rasterizer::{Camera, Vec3, Texture, RasterSettings};
 use super::texture_pack::TexturePack;
 
 /// TRLE grid constraints
@@ -106,6 +106,9 @@ pub struct EditorState {
     pub texture_packs: Vec<TexturePack>,
     pub selected_pack: usize,
     pub texture_scroll: f32,
+
+    /// Rasterizer settings (PS1 effects)
+    pub raster_settings: RasterSettings,
 }
 
 impl EditorState {
@@ -161,6 +164,7 @@ impl EditorState {
             texture_packs,
             selected_pack: 0,
             texture_scroll: 0.0,
+            raster_settings: RasterSettings::default(), // PS1 mode by default
         }
     }
 

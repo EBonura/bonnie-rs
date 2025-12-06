@@ -18,3 +18,7 @@ pub use render::*;
 /// Screen dimensions (authentic PS1 resolution)
 pub const WIDTH: usize = 320;
 pub const HEIGHT: usize = 240;
+
+/// High resolution dimensions (2x PS1)
+pub const WIDTH_HI: usize = 640;
+pub const HEIGHT_HI: usize = 480;
