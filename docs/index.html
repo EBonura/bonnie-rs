@@ -196,24 +196,35 @@
         var AudioOutput = {
             ctx: null,
             sampleRate: 44100,
-            nextStartTime: 0,
-            // Target buffer ahead time (50ms provides stability without too much latency)
-            bufferAhead: 0.05,
+            workletNode: null,
+            workletReady: false,
 
             init: function(sampleRate) {
                 AudioOutput.sampleRate = sampleRate;
                 console.log('Audio output initialized, sample rate:', sampleRate);
             },
 
-            ensureContext: function() {
+            ensureContext: async function() {
                 if (!AudioOutput.ctx) {
                     try {
                         AudioOutput.ctx = new (window.AudioContext || window.webkitAudioContext)({
                             sampleRate: AudioOutput.sampleRate
                         });
                         console.log('AudioContext created, state:', AudioOutput.ctx.state);
+
+                        // Load and register the AudioWorklet processor
+                        await AudioOutput.ctx.audioWorklet.addModule('audio-processor.js');
+                        console.log('AudioWorklet module loaded');
+
+                        // Create the worklet node
+                        AudioOutput.workletNode = new AudioWorkletNode(AudioOutput.ctx, 'bonnie-audio-processor', {
+                            outputChannelCount: [2]
+                        });
+                        AudioOutput.workletNode.connect(AudioOutput.ctx.destination);
+                        AudioOutput.workletReady = true;
+                        console.log('AudioWorklet node connected');
                     } catch (e) {
-                        console.error('Failed to create AudioContext:', e);
+                        console.error('Failed to create AudioContext or Worklet:', e);
                         return null;
                     }
                 }
@@ -224,51 +235,37 @@
             },
 
             write: function(leftPtr, rightPtr, len) {
-                var ctx = AudioOutput.ensureContext();
-                if (!ctx) return;
+                // Ensure context is initialized (async, but we call it synchronously)
+                if (!AudioOutput.ctx) {
+                    AudioOutput.ensureContext();
+                    return; // Skip this frame while initializing
+                }
 
-                var now = ctx.currentTime;
+                if (!AudioOutput.workletReady || !AudioOutput.workletNode) {
+                    return; // Worklet not ready yet
+                }
+
+                // Resume if suspended (user interaction required)
+                if (AudioOutput.ctx.state === 'suspended') {
+                    AudioOutput.ctx.resume();
+                }
 
                 // Copy samples from WASM memory
                 var leftView = new Float32Array(wasm_exports.memory.buffer, leftPtr, len);
                 var rightView = new Float32Array(wasm_exports.memory.buffer, rightPtr, len);
 
-                // Quick check for silence (skip scheduling silent buffers)
-                var maxSample = 0;
-                for (var i = 0; i < len; i += 64) {
-                    var s = Math.abs(leftView[i]) + Math.abs(rightView[i]);
-                    if (s > maxSample) maxSample = s;
-                }
+                // Copy to new arrays (can't transfer views of WASM memory)
+                var leftCopy = new Float32Array(len);
+                var rightCopy = new Float32Array(len);
+                leftCopy.set(leftView);
+                rightCopy.set(rightView);
 
-                if (maxSample < 0.0001) {
-                    // Silent - reset timing so next sound plays immediately
-                    if (AudioOutput.nextStartTime < now) {
-                        AudioOutput.nextStartTime = now;
-                    }
-                    return;
-                }
-
-                // Don't queue too far ahead
-                if (AudioOutput.nextStartTime > now + AudioOutput.bufferAhead * 2) {
-                    return;
-                }
-
-                // Create buffer and copy data
-                var buffer = ctx.createBuffer(2, len, AudioOutput.sampleRate);
-                buffer.getChannelData(0).set(leftView);
-                buffer.getChannelData(1).set(rightView);
-
-                var source = ctx.createBufferSource();
-                source.buffer = buffer;
-                source.connect(ctx.destination);
-
-                // Schedule: if we've fallen behind, catch up with small latency
-                if (AudioOutput.nextStartTime < now) {
-                    AudioOutput.nextStartTime = now + 0.005; // 5ms initial latency
-                }
-
-                source.start(AudioOutput.nextStartTime);
-                AudioOutput.nextStartTime += buffer.duration;
+                // Send to worklet via message port
+                AudioOutput.workletNode.port.postMessage({
+                    type: 'audio',
+                    left: leftCopy,
+                    right: rightCopy
+                });
             }
         };
 
