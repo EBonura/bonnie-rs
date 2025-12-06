@@ -216,10 +216,6 @@ async fn main() {
                 handle_editor_action(action, ws);
             }
 
-            Tool::SoundDesigner => {
-                draw_placeholder(content_rect, "Sound Designer", Color::from_rgba(25, 30, 35, 255));
-            }
-
             Tool::Tracker => {
                 // Update playback timing
                 let delta = get_frame_time() as f64;
@@ -227,10 +223,6 @@ async fn main() {
 
                 // Draw tracker UI
                 tracker::draw_tracker(&mut ui_ctx, content_rect, &mut app.tracker);
-            }
-
-            Tool::Game => {
-                draw_placeholder(content_rect, "Game Preview", Color::from_rgba(20, 20, 25, 255));
             }
         }
 
@@ -241,18 +233,6 @@ async fn main() {
     }
 }
 
-fn draw_placeholder(rect: Rect, name: &str, bg_color: Color) {
-    draw_rectangle(rect.x, rect.y, rect.w, rect.h, bg_color);
-    let text = format!("{} - Coming Soon", name);
-    let text_width = measure_text(&text, None, 24, 1.0).width;
-    draw_text(
-        &text,
-        rect.x + (rect.w - text_width) * 0.5,
-        rect.y + rect.h * 0.5,
-        24.0,
-        Color::from_rgba(100, 100, 100, 255),
-    );
-}
 
 fn handle_editor_action(action: EditorAction, ws: &mut app::WorldEditorState) {
     match action {

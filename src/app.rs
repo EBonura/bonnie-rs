@@ -15,37 +15,29 @@ use std::path::PathBuf;
 pub enum Tool {
     Home = 0,
     WorldEditor = 1,
-    SoundDesigner = 2,
-    Tracker = 3,
-    Game = 4,
+    Tracker = 2,
 }
 
 impl Tool {
-    pub const ALL: [Tool; 5] = [
+    pub const ALL: [Tool; 3] = [
         Tool::Home,
         Tool::WorldEditor,
-        Tool::SoundDesigner,
         Tool::Tracker,
-        Tool::Game,
     ];
 
     pub fn label(&self) -> &'static str {
         match self {
             Tool::Home => "Home",
             Tool::WorldEditor => "World Editor",
-            Tool::SoundDesigner => "Sound Designer",
             Tool::Tracker => "Music Editor",
-            Tool::Game => "Game",
         }
     }
 
-    pub fn labels() -> [&'static str; 5] {
+    pub fn labels() -> [&'static str; 3] {
         [
             Tool::Home.label(),
             Tool::WorldEditor.label(),
-            Tool::SoundDesigner.label(),
             Tool::Tracker.label(),
-            Tool::Game.label(),
         ]
     }
 
@@ -60,18 +52,6 @@ pub struct WorldEditorState {
     pub editor_layout: EditorLayout,
 }
 
-/// State for Sound Designer (placeholder)
-pub struct SoundDesignerState {
-    // TODO: Add sound designer state
-}
-
-// TrackerState is now imported from crate::tracker
-
-/// State for Game preview (placeholder)
-pub struct GameState {
-    // TODO: Add game state (camera, etc.)
-}
-
 /// Main application state containing all tool states
 pub struct AppState {
     /// Currently active tool
@@ -83,14 +63,8 @@ pub struct AppState {
     /// World Editor state
     pub world_editor: WorldEditorState,
 
-    /// Sound Designer state
-    pub sound_designer: SoundDesignerState,
-
-    /// Tracker state
+    /// Music Editor state
     pub tracker: TrackerState,
-
-    /// Game state
-    pub game: GameState,
 
     /// Icon font (Lucide)
     pub icon_font: Option<Font>,
@@ -112,9 +86,7 @@ impl AppState {
                 editor_state,
                 editor_layout: EditorLayout::new(),
             },
-            sound_designer: SoundDesignerState {},
             tracker: TrackerState::new(),
-            game: GameState {},
             icon_font,
         }
     }
