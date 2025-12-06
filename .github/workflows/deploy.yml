@@ -34,7 +34,7 @@ jobs:
       - name: Prepare deploy folder
         run: |
           mkdir -p deploy
-          cp target/wasm32-unknown-unknown/release/bonnie-rs.wasm deploy/
+          cp target/wasm32-unknown-unknown/release/bonnie-engine.wasm deploy/
           cp docs/index.html deploy/
           cp docs/favicon-16.png deploy/
           cp docs/favicon-32.png deploy/

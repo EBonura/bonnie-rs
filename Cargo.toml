@@ -1,9 +1,13 @@
 [package]
-name = "bonnie-rs"
+name = "bonnie-engine"
 version = "0.1.0"
 edition = "2021"
 description = "PS1-style software rasterizer engine"
 authors = ["ebonura"]
+
+[[bin]]
+name = "bonnie-engine"
+path = "src/main.rs"
 
 [dependencies]
 macroquad = "0.4"

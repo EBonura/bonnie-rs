@@ -11,6 +11,8 @@ mod layout;
 mod grid_view;
 mod viewport_3d;
 mod texture_palette;
+mod texture_pack;
 
 pub use state::*;
 pub use layout::*;
+pub use texture_pack::TexturePack;

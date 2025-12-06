@@ -247,7 +247,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "bonnie-rs"
+name = "bonnie-engine"
 version = "0.1.0"
 dependencies = [
  "image 0.25.9",

@@ -1,5 +1,8 @@
 # Bonnie Engine
 
+[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/ebonura/bonnie-engine/releases)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 **Live Demo:** [https://ebonura.github.io/bonnie-engine](https://ebonura.github.io/bonnie-engine)
 
 ---
