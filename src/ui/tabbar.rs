@@ -111,7 +111,7 @@ pub fn draw_fixed_tabs(
             );
         }
 
-        // Draw label centered - all values already rounded, just need to round the centering calc
+        // Draw label centered with crisp rendering
         let text_color = if is_active {
             style::TAB_ACTIVE_TEXT
         } else {
@@ -120,7 +120,19 @@ pub fn draw_fixed_tabs(
 
         let text_x = (tab_rect.x + (tab_rect.w - text_dims.width) * 0.5).round();
         let text_y = (tab_rect.y + (tab_rect.h + text_dims.height) * 0.5 - 2.0).round();
-        draw_text(label, text_x, text_y, layout::FONT_SIZE, text_color);
+        draw_text_ex(
+            label,
+            text_x,
+            text_y,
+            TextParams {
+                font: None,
+                font_size: layout::FONT_SIZE as u16,
+                font_scale: 1.0,
+                font_scale_aspect: 1.0,
+                color: text_color,
+                ..Default::default()
+            },
+        );
 
         // Handle click
         if ctx.mouse.clicked(&tab_rect) {

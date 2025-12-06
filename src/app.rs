@@ -4,6 +4,7 @@
 //! Switch between tools via the tab bar - all tools stay alive in background.
 
 use crate::editor::{EditorState, EditorLayout};
+use crate::landing::LandingState;
 use crate::world::Level;
 use macroquad::prelude::Font;
 use std::path::PathBuf;
@@ -11,14 +12,16 @@ use std::path::PathBuf;
 /// The available tools (fixed set, one tab each)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Tool {
-    WorldEditor = 0,
-    SoundDesigner = 1,
-    Tracker = 2,
-    Game = 3,
+    Home = 0,
+    WorldEditor = 1,
+    SoundDesigner = 2,
+    Tracker = 3,
+    Game = 4,
 }
 
 impl Tool {
-    pub const ALL: [Tool; 4] = [
+    pub const ALL: [Tool; 5] = [
+        Tool::Home,
         Tool::WorldEditor,
         Tool::SoundDesigner,
         Tool::Tracker,
@@ -27,6 +30,7 @@ impl Tool {
 
     pub fn label(&self) -> &'static str {
         match self {
+            Tool::Home => "Home",
             Tool::WorldEditor => "World Editor",
             Tool::SoundDesigner => "Sound Designer",
             Tool::Tracker => "Tracker",
@@ -34,8 +38,9 @@ impl Tool {
         }
     }
 
-    pub fn labels() -> [&'static str; 4] {
+    pub fn labels() -> [&'static str; 5] {
         [
+            Tool::Home.label(),
             Tool::WorldEditor.label(),
             Tool::SoundDesigner.label(),
             Tool::Tracker.label(),
@@ -74,6 +79,9 @@ pub struct AppState {
     /// Currently active tool
     pub active_tool: Tool,
 
+    /// Landing page state
+    pub landing: LandingState,
+
     /// World Editor state
     pub world_editor: WorldEditorState,
 
@@ -100,7 +108,8 @@ impl AppState {
         };
 
         Self {
-            active_tool: Tool::WorldEditor,
+            active_tool: Tool::Home,
+            landing: LandingState::new(),
             world_editor: WorldEditorState {
                 editor_state,
                 editor_layout: EditorLayout::new(),

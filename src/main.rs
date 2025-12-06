@@ -1,4 +1,4 @@
-//! bonnie-rs: PS1-style software rasterizer engine
+//! Bonnie Engine: PS1-style software rasterizer engine
 //!
 //! A souls-like game engine with authentic PlayStation 1 rendering:
 //! - Affine texture mapping (warpy textures)
@@ -7,10 +7,14 @@
 //! - Low resolution (320x240)
 //! - TR1-style room-based levels with portal culling
 
+/// Version from Cargo.toml
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 mod rasterizer;
 mod world;
 mod ui;
 mod editor;
+mod landing;
 mod app;
 
 use macroquad::prelude::*;
@@ -23,10 +27,15 @@ use std::path::PathBuf;
 
 fn window_conf() -> Conf {
     Conf {
-        window_title: "Bonnie Engine".to_owned(),
+        window_title: format!("Bonnie Engine v{}", VERSION),
         window_width: WIDTH as i32 * 3,
         window_height: HEIGHT as i32 * 3,
         window_resizable: true,
+        icon: Some(miniquad::conf::Icon {
+            small: *include_bytes!("../assets/icons/icon16.rgba"),
+            medium: *include_bytes!("../assets/icons/icon32.rgba"),
+            big: *include_bytes!("../assets/icons/icon64.rgba"),
+        }),
         ..Default::default()
     }
 }
@@ -136,6 +145,10 @@ async fn main() {
 
         // Draw active tool content
         match app.active_tool {
+            Tool::Home => {
+                landing::draw_landing(content_rect, &mut app.landing);
+            }
+
             Tool::WorldEditor => {
                 let ws = &mut app.world_editor;
 
