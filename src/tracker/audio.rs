@@ -231,10 +231,9 @@ impl AudioEngine {
     pub fn render_audio(&mut self) {
         let mut state = self.state.lock().unwrap();
         if let Some(ref mut synth) = state.synth {
-            // Render more samples per frame to reduce crackling
-            // At 60fps, 44100/60 ≈ 735 samples per frame
-            // Use 2048 to provide headroom for frame timing variance
-            let samples = 2048;
+            // At 60fps, we need 44100/60 ≈ 735 samples per frame
+            // Use 1024 (power of 2) for efficiency
+            let samples = 1024;
             if self.left_buffer.len() < samples {
                 self.left_buffer.resize(samples, 0.0);
                 self.right_buffer.resize(samples, 0.0);

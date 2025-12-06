@@ -197,18 +197,11 @@
             ctx: null,
             sampleRate: 44100,
             nextStartTime: 0,
-            // Ring buffer for accumulating samples
-            ringBuffer: { left: null, right: null, writePos: 0, size: 8192 },
-            // Minimum samples to buffer before scheduling (reduces crackling)
-            minBufferSamples: 2048,
-            // Track if we have active sound
-            hasActiveSound: false,
-            silenceFrames: 0,
+            // Target buffer ahead time (50ms provides stability without too much latency)
+            bufferAhead: 0.05,
 
             init: function(sampleRate) {
                 AudioOutput.sampleRate = sampleRate;
-                AudioOutput.ringBuffer.left = new Float32Array(AudioOutput.ringBuffer.size);
-                AudioOutput.ringBuffer.right = new Float32Array(AudioOutput.ringBuffer.size);
                 console.log('Audio output initialized, sample rate:', sampleRate);
             },
 
@@ -225,9 +218,7 @@
                     }
                 }
                 if (AudioOutput.ctx.state === 'suspended') {
-                    AudioOutput.ctx.resume().then(function() {
-                        console.log('AudioContext resumed');
-                    });
+                    AudioOutput.ctx.resume();
                 }
                 return AudioOutput.ctx;
             },
@@ -236,72 +227,46 @@
                 var ctx = AudioOutput.ensureContext();
                 if (!ctx) return;
 
+                var now = ctx.currentTime;
+
                 // Copy samples from WASM memory
                 var leftView = new Float32Array(wasm_exports.memory.buffer, leftPtr, len);
                 var rightView = new Float32Array(wasm_exports.memory.buffer, rightPtr, len);
 
-                // Check if there's any non-zero audio
-                var hasAudio = false;
-                for (var i = 0; i < len; i += 32) {
-                    if (Math.abs(leftView[i]) > 0.0001 || Math.abs(rightView[i]) > 0.0001) {
-                        hasAudio = true;
-                        break;
-                    }
+                // Quick check for silence (skip scheduling silent buffers)
+                var maxSample = 0;
+                for (var i = 0; i < len; i += 64) {
+                    var s = Math.abs(leftView[i]) + Math.abs(rightView[i]);
+                    if (s > maxSample) maxSample = s;
                 }
 
-                if (!hasAudio) {
-                    AudioOutput.silenceFrames++;
-                    // After ~10 frames of silence, reset for immediate playback
-                    if (AudioOutput.silenceFrames > 10) {
-                        AudioOutput.nextStartTime = 0;
-                        AudioOutput.ringBuffer.writePos = 0;
-                        AudioOutput.hasActiveSound = false;
+                if (maxSample < 0.0001) {
+                    // Silent - reset timing so next sound plays immediately
+                    if (AudioOutput.nextStartTime < now) {
+                        AudioOutput.nextStartTime = now;
                     }
                     return;
                 }
 
-                AudioOutput.silenceFrames = 0;
-                AudioOutput.hasActiveSound = true;
-
-                // Accumulate samples into ring buffer
-                var rb = AudioOutput.ringBuffer;
-                for (var i = 0; i < len; i++) {
-                    rb.left[rb.writePos] = leftView[i];
-                    rb.right[rb.writePos] = rightView[i];
-                    rb.writePos++;
-
-                    // When we have enough samples, schedule a chunk
-                    if (rb.writePos >= AudioOutput.minBufferSamples) {
-                        AudioOutput.scheduleChunk(rb.left.slice(0, rb.writePos), rb.right.slice(0, rb.writePos));
-                        rb.writePos = 0;
-                    }
-                }
-            },
-
-            scheduleChunk: function(leftData, rightData) {
-                var ctx = AudioOutput.ctx;
-                var now = ctx.currentTime;
-                var len = leftData.length;
-
-                // Don't queue too far ahead (max 150ms buffer for smooth playback)
-                if (AudioOutput.nextStartTime > now + 0.15) {
+                // Don't queue too far ahead
+                if (AudioOutput.nextStartTime > now + AudioOutput.bufferAhead * 2) {
                     return;
                 }
 
-                // Create and schedule audio buffer
+                // Create buffer and copy data
                 var buffer = ctx.createBuffer(2, len, AudioOutput.sampleRate);
-                buffer.getChannelData(0).set(leftData);
-                buffer.getChannelData(1).set(rightData);
+                buffer.getChannelData(0).set(leftView);
+                buffer.getChannelData(1).set(rightView);
 
                 var source = ctx.createBufferSource();
                 source.buffer = buffer;
                 source.connect(ctx.destination);
 
-                // Schedule seamlessly after previous buffer
-                // Add a tiny overlap to prevent gaps
+                // Schedule: if we've fallen behind, catch up with small latency
                 if (AudioOutput.nextStartTime < now) {
-                    AudioOutput.nextStartTime = now + 0.01; // 10ms initial latency
+                    AudioOutput.nextStartTime = now + 0.005; // 5ms initial latency
                 }
+
                 source.start(AudioOutput.nextStartTime);
                 AudioOutput.nextStartTime += buffer.duration;
             }
