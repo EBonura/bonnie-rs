@@ -149,48 +149,32 @@ impl TexturePack {
 
         set_status("Loading textures...");
 
-        // Load each pack with parallel texture loading using futures::join_all
+        // Load textures sequentially (macroquad's async runtime doesn't support parallel futures)
         let mut packs = Vec::new();
-        const BATCH_SIZE: usize = 50; // Load 50 textures in parallel at a time
 
         for (pack_name, files) in pack_files {
             set_status(&format!("Loading {}...", pack_name));
 
             let mut textures = Vec::with_capacity(files.len());
 
-            // Process in batches for true parallel loading
-            for chunk in files.chunks(BATCH_SIZE) {
-                // Create futures for all textures in this batch
-                let futures: Vec<_> = chunk.iter().map(|filename| {
-                    let tex_path = format!("assets/textures/{}/{}", pack_name, filename);
-                    let tex_name = filename.strip_suffix(".png")
-                        .or_else(|| filename.strip_suffix(".PNG"))
-                        .unwrap_or(filename)
-                        .to_string();
+            for filename in &files {
+                let tex_path = format!("assets/textures/{}/{}", pack_name, filename);
+                let tex_name = filename.strip_suffix(".png")
+                    .or_else(|| filename.strip_suffix(".PNG"))
+                    .unwrap_or(filename)
+                    .to_string();
 
-                    async move {
-                        let result = load_file(&tex_path).await;
-                        (tex_name, tex_path, result)
-                    }
-                }).collect();
-
-                // Wait for all futures in this batch to complete in parallel
-                let results = futures::future::join_all(futures).await;
-
-                // Process all results
-                for (tex_name, tex_path, result) in results {
-                    match result {
-                        Ok(bytes) => {
-                            match Texture::from_bytes(&bytes, tex_name) {
-                                Ok(tex) => textures.push(tex),
-                                Err(e) => eprintln!("Failed to decode texture: {}", e),
-                            }
+                match load_file(&tex_path).await {
+                    Ok(bytes) => {
+                        match Texture::from_bytes(&bytes, tex_name) {
+                            Ok(tex) => textures.push(tex),
+                            Err(e) => eprintln!("Failed to decode texture: {}", e),
                         }
-                        Err(e) => eprintln!("Failed to load texture {}: {}", tex_path, e),
                     }
-                    loaded_count += 1;
-                    set_progress(loaded_count, total_textures);
+                    Err(e) => eprintln!("Failed to load texture {}: {}", tex_path, e),
                 }
+                loaded_count += 1;
+                set_progress(loaded_count, total_textures);
             }
 
             if !textures.is_empty() {
