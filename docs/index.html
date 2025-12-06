@@ -36,10 +36,33 @@
             font-family: monospace;
             font-size: 18px;
             z-index: 10;
+            text-align: center;
+        }
+        #loading-bar-container {
+            width: 300px;
+            height: 8px;
+            background: #333;
+            border-radius: 4px;
+            margin-top: 16px;
+            overflow: hidden;
+        }
+        #loading-bar {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #00bfe6, #00d4ff);
+            border-radius: 4px;
+            transition: width 0.1s ease-out;
         }
     </style>
 </head>
 <body>
+    <div id="loading">
+        <div>Loading Bonnie Engine...</div>
+        <div id="loading-bar-container">
+            <div id="loading-bar"></div>
+        </div>
+        <div id="loading-status" style="margin-top: 8px; font-size: 14px; color: #888;"></div>
+    </div>
     <canvas id="glcanvas" tabindex="1"></canvas>
     <script src="mq_js_bundle.js"></script>
     <script>
@@ -157,6 +180,25 @@
             console.log('bonnie_clear_import: cleared import data');
         };
 
+        // Loading progress functions
+        window.bonnie_set_loading_progress = function(current, total) {
+            var percent = total > 0 ? (current / total) * 100 : 0;
+            var bar = document.getElementById('loading-bar');
+            if (bar) bar.style.width = percent + '%';
+        };
+
+        window.bonnie_set_loading_status = function(ptr, len) {
+            var bytes = new Uint8Array(wasm_exports.memory.buffer, ptr, len);
+            var status = new TextDecoder().decode(bytes);
+            var el = document.getElementById('loading-status');
+            if (el) el.textContent = status;
+        };
+
+        window.bonnie_hide_loading = function() {
+            var el = document.getElementById('loading');
+            if (el) el.style.display = 'none';
+        };
+
         // Register as WASM imports so Rust can call them
         miniquad_add_plugin({
             register_plugin: function(importObject) {
@@ -170,6 +212,9 @@
                 importObject.env.bonnie_set_export_data = window.bonnie_set_export_data;
                 importObject.env.bonnie_set_export_filename = window.bonnie_set_export_filename;
                 importObject.env.bonnie_trigger_download = window.bonnie_trigger_download;
+                importObject.env.bonnie_set_loading_progress = window.bonnie_set_loading_progress;
+                importObject.env.bonnie_set_loading_status = window.bonnie_set_loading_status;
+                importObject.env.bonnie_hide_loading = window.bonnie_hide_loading;
             }
         });
 

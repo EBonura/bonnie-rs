@@ -76,17 +76,50 @@ impl TexturePack {
     pub async fn load_from_manifest() -> Vec<Self> {
         use macroquad::prelude::*;
 
+        #[cfg(target_arch = "wasm32")]
+        extern "C" {
+            fn bonnie_set_loading_progress(current: u32, total: u32);
+            fn bonnie_set_loading_status(ptr: *const u8, len: usize);
+            fn bonnie_hide_loading();
+        }
+
+        #[cfg(target_arch = "wasm32")]
+        fn set_status(msg: &str) {
+            unsafe { bonnie_set_loading_status(msg.as_ptr(), msg.len()); }
+        }
+
+        #[cfg(target_arch = "wasm32")]
+        fn set_progress(current: u32, total: u32) {
+            unsafe { bonnie_set_loading_progress(current, total); }
+        }
+
+        #[cfg(not(target_arch = "wasm32"))]
+        fn set_status(_msg: &str) {}
+
+        #[cfg(not(target_arch = "wasm32"))]
+        fn set_progress(_current: u32, _total: u32) {}
+
+        set_status("Loading texture manifest...");
+
         let manifest_path = "assets/textures/manifest.txt";
         let manifest = match load_string(manifest_path).await {
             Ok(s) => s,
             Err(e) => {
                 eprintln!("Failed to load texture manifest: {}", e);
+                #[cfg(target_arch = "wasm32")]
+                unsafe { bonnie_hide_loading(); }
                 return Vec::new();
             }
         };
 
+        // Count total textures for progress bar
+        let total_textures = manifest.lines()
+            .filter(|l| !l.trim().is_empty() && !l.trim().starts_with('['))
+            .count() as u32;
+
         let mut packs = Vec::new();
         let mut current_pack: Option<(String, Vec<Texture>)> = None;
+        let mut loaded_count: u32 = 0;
 
         for line in manifest.lines() {
             let line = line.trim();
@@ -107,6 +140,7 @@ impl TexturePack {
                 }
                 // Start new pack
                 let pack_name = line[1..line.len()-1].to_string();
+                set_status(&format!("Loading {}...", pack_name));
                 current_pack = Some((pack_name, Vec::new()));
             } else if let Some((ref pack_name, ref mut textures)) = current_pack {
                 // Load texture file
@@ -124,6 +158,8 @@ impl TexturePack {
                     }
                     Err(e) => eprintln!("Failed to load {}: {}", tex_path, e),
                 }
+                loaded_count += 1;
+                set_progress(loaded_count, total_textures);
             }
         }
 
@@ -139,6 +175,10 @@ impl TexturePack {
         }
 
         println!("Loaded {} texture packs from manifest", packs.len());
+
+        #[cfg(target_arch = "wasm32")]
+        unsafe { bonnie_hide_loading(); }
+
         packs
     }
 }
