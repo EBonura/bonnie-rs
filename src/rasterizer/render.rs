@@ -399,13 +399,34 @@ pub fn render_mesh(
             continue;
         }
 
+        // Use the stored vertex normals to determine face orientation
+        // Average the three vertex normals (already in camera space)
+        let vn1 = cam_space_normals[face.v0];
+        let vn2 = cam_space_normals[face.v1];
+        let vn3 = cam_space_normals[face.v2];
+        let face_normal = Vec3::new(
+            (vn1.x + vn2.x + vn3.x) / 3.0,
+            (vn1.y + vn2.y + vn3.y) / 3.0,
+            (vn1.z + vn2.z + vn3.z) / 3.0,
+        ).normalize();
+
+        // Calculate view direction from camera to face center (in camera space)
+        // Camera is at origin in camera space, so view dir is just the position
+        let face_center = Vec3::new(
+            (cv1.x + cv2.x + cv3.x) / 3.0,
+            (cv1.y + cv2.y + cv3.y) / 3.0,
+            (cv1.z + cv2.z + cv3.z) / 3.0,
+        );
+        let view_dir = face_center.normalize();
+
+        // Face is back-facing if its normal points away from us (same direction as view)
+        // Dot product > 0 means normal and view direction point the same way = back-facing
+        let is_backface = face_normal.dot(view_dir) > 0.0;
+
+        // Also compute geometric normal for shading (cross product gives correct winding)
         let edge1 = cv2 - cv1;
         let edge2 = cv3 - cv1;
         let normal = edge1.cross(edge2).normalize();
-
-        // Check if face is back-facing (normal points away from camera)
-        // In our coordinate system, +Z is forward (camera looks down +Z axis)
-        let is_backface = normal.z > 0.0;
 
         if is_backface {
             // Back-face: collect for wireframe rendering (always, regardless of backface_cull setting)
