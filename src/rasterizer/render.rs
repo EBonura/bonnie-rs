@@ -379,8 +379,9 @@ pub fn render_mesh(
         cam_space_normals.push(cam_normal.normalize());
     }
 
-    // Build surfaces for visible faces
+    // Build surfaces for front-faces and collect back-faces for wireframe
     let mut surfaces: Vec<Surface> = Vec::with_capacity(faces.len());
+    let mut backface_wireframes: Vec<(Vec3, Vec3, Vec3)> = Vec::new();
 
     for (face_idx, face) in faces.iter().enumerate() {
         let v1 = projected[face.v0];
@@ -402,30 +403,46 @@ pub fn render_mesh(
         let edge2 = cv3 - cv1;
         let normal = edge1.cross(edge2).normalize();
 
-        // Backface culling - check if face points toward camera
+        // Check if face is back-facing (normal points away from camera)
         // In our coordinate system, +Z is forward (camera looks down +Z axis)
-        // We want to render faces whose normals point back toward the camera (negative Z)
-        if settings.backface_cull {
-            // Check if normal points away from camera (positive Z component)
-            // If normal.z > 0, the face is pointing away, so cull it
-            if normal.z > 0.0 {
-                continue;
-            }
-        }
+        let is_backface = normal.z > 0.0;
 
-        surfaces.push(Surface {
-            v1,
-            v2,
-            v3,
-            vn1: cam_space_normals[face.v0],
-            vn2: cam_space_normals[face.v1],
-            vn3: cam_space_normals[face.v2],
-            uv1: vertices[face.v0].uv,
-            uv2: vertices[face.v1].uv,
-            uv3: vertices[face.v2].uv,
-            normal,
-            face_idx,
-        });
+        if is_backface {
+            // Back-face: collect for wireframe rendering (always, regardless of backface_cull setting)
+            backface_wireframes.push((v1, v2, v3));
+
+            // If backface culling is disabled, also render as solid
+            if !settings.backface_cull {
+                surfaces.push(Surface {
+                    v1,
+                    v2,
+                    v3,
+                    vn1: cam_space_normals[face.v0].scale(-1.0),
+                    vn2: cam_space_normals[face.v1].scale(-1.0),
+                    vn3: cam_space_normals[face.v2].scale(-1.0),
+                    uv1: vertices[face.v0].uv,
+                    uv2: vertices[face.v1].uv,
+                    uv3: vertices[face.v2].uv,
+                    normal: normal.scale(-1.0),
+                    face_idx,
+                });
+            }
+        } else {
+            // Front-face: always render as solid
+            surfaces.push(Surface {
+                v1,
+                v2,
+                v3,
+                vn1: cam_space_normals[face.v0],
+                vn2: cam_space_normals[face.v1],
+                vn3: cam_space_normals[face.v2],
+                uv1: vertices[face.v0].uv,
+                uv2: vertices[face.v1].uv,
+                uv3: vertices[face.v2].uv,
+                normal,
+                face_idx,
+            });
+        }
     }
 
     // Sort by depth if not using Z-buffer (painter's algorithm)
@@ -437,12 +454,23 @@ pub fn render_mesh(
         });
     }
 
-    // Rasterize each surface
+    // Rasterize each solid surface
     for surface in &surfaces {
         let texture = faces[surface.face_idx]
             .texture_id
             .and_then(|id| textures.get(id));
         rasterize_triangle(fb, surface, texture, settings);
+    }
+
+    // Draw wireframes for back-faces (visible but not solid)
+    // Only draw if backface culling is enabled (otherwise they're rendered solid above)
+    if settings.backface_cull {
+        let wireframe_color = Color::new(80, 80, 100);
+        for (v1, v2, v3) in &backface_wireframes {
+            fb.draw_line(v1.x as i32, v1.y as i32, v2.x as i32, v2.y as i32, wireframe_color);
+            fb.draw_line(v2.x as i32, v2.y as i32, v3.x as i32, v3.y as i32, wireframe_color);
+            fb.draw_line(v3.x as i32, v3.y as i32, v1.x as i32, v1.y as i32, wireframe_color);
+        }
     }
 }
 

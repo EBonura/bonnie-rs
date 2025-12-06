@@ -164,7 +164,7 @@ impl EditorState {
             texture_packs,
             selected_pack: 0,
             texture_scroll: 0.0,
-            raster_settings: RasterSettings::default(), // PS1 mode by default
+            raster_settings: RasterSettings::default(), // backface_cull=true shows backfaces as wireframe
         }
     }
 
