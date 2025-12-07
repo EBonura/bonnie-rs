@@ -164,6 +164,12 @@ pub struct EditorState {
     /// Properties panel scroll offset
     pub properties_scroll: f32,
 
+    /// Placement height adjustment (for DrawFloor/DrawCeiling/DrawWall modes)
+    pub placement_target_y: f32,           // Current Y height for new placements
+    pub height_adjust_mode: bool,          // True when Shift is held for height adjustment
+    pub height_adjust_start_mouse_y: f32,  // Mouse Y when height adjust started
+    pub height_adjust_start_y: f32,        // placement_target_y when height adjust started
+
     /// Rasterizer settings (PS1 effects)
     pub raster_settings: RasterSettings,
 }
@@ -224,6 +230,10 @@ impl EditorState {
             selected_pack: 0,
             texture_scroll: 0.0,
             properties_scroll: 0.0,
+            placement_target_y: 0.0,
+            height_adjust_mode: false,
+            height_adjust_start_mouse_y: 0.0,
+            height_adjust_start_y: 0.0,
             raster_settings: RasterSettings::default(), // backface_cull=true shows backfaces as wireframe
         }
     }

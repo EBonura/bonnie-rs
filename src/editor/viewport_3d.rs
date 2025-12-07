@@ -475,10 +475,43 @@ pub fn draw_viewport_3d(
     // In drawing modes, find preview sector position
     if inside_viewport && (state.tool == EditorTool::DrawFloor || state.tool == EditorTool::DrawCeiling) {
         if let Some((mouse_fb_x, mouse_fb_y)) = screen_to_fb(mouse_pos.0, mouse_pos.1) {
-            use super::CEILING_HEIGHT;
+            use super::{CEILING_HEIGHT, CLICK_HEIGHT};
 
-            let target_y = if state.tool == EditorTool::DrawFloor { 0.0 } else { CEILING_HEIGHT };
             let is_floor = state.tool == EditorTool::DrawFloor;
+
+            // Handle Shift+drag for height adjustment
+            let shift_down = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
+
+            if shift_down && !state.height_adjust_mode {
+                // Just started holding shift - enter height adjust mode
+                state.height_adjust_mode = true;
+                state.height_adjust_start_mouse_y = mouse_pos.1;
+                state.height_adjust_start_y = state.placement_target_y;
+            } else if !shift_down && state.height_adjust_mode {
+                // Released shift - exit height adjust mode
+                state.height_adjust_mode = false;
+            }
+
+            // Adjust height while shift is held
+            if state.height_adjust_mode {
+                let mouse_delta = state.height_adjust_start_mouse_y - mouse_pos.1;
+                let y_sensitivity = 5.0;
+                let raw_delta = mouse_delta * y_sensitivity;
+                // Snap to CLICK_HEIGHT increments
+                let snapped_delta = (raw_delta / CLICK_HEIGHT).round() * CLICK_HEIGHT;
+                state.placement_target_y = state.height_adjust_start_y + snapped_delta;
+                // Show height in status bar
+                let clicks = (state.placement_target_y / CLICK_HEIGHT) as i32;
+                state.set_status(&format!("Height: {:.0} ({} clicks)", state.placement_target_y, clicks), 0.5);
+            }
+
+            // Use placement_target_y, but initialize to sensible default if zero
+            let target_y = if state.placement_target_y == 0.0 && !state.height_adjust_mode {
+                // Default: floor at 0, ceiling at CEILING_HEIGHT
+                if is_floor { 0.0 } else { CEILING_HEIGHT }
+            } else {
+                state.placement_target_y
+            };
 
             let search_radius = 20;
             let cam_x = state.camera_3d.position.x;
