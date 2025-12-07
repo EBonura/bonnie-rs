@@ -479,17 +479,70 @@ pub fn draw_viewport_3d(
 
             let is_floor = state.tool == EditorTool::DrawFloor;
 
+            // Use placement_target_y, but initialize to sensible default if zero
+            let target_y = if state.placement_target_y == 0.0 && !state.height_adjust_mode {
+                // Default: floor at 0, ceiling at CEILING_HEIGHT
+                if is_floor { 0.0 } else { CEILING_HEIGHT }
+            } else {
+                state.placement_target_y
+            };
+
+            // Find closest sector to mouse cursor (only when not in height adjust mode)
+            let (snapped_x, snapped_z) = if let Some((locked_x, locked_z)) = state.height_adjust_locked_pos {
+                // Use locked position when in height adjust mode
+                (locked_x, locked_z)
+            } else {
+                // Find closest grid position to mouse
+                let search_radius = 20;
+                let cam_x = state.camera_3d.position.x;
+                let cam_z = state.camera_3d.position.z;
+                let start_x = ((cam_x / SECTOR_SIZE).floor() as i32 - search_radius) as f32 * SECTOR_SIZE;
+                let start_z = ((cam_z / SECTOR_SIZE).floor() as i32 - search_radius) as f32 * SECTOR_SIZE;
+
+                let mut closest: Option<(f32, f32, f32)> = None;
+                for ix in 0..(search_radius * 2) {
+                    for iz in 0..(search_radius * 2) {
+                        let grid_x = start_x + (ix as f32 * SECTOR_SIZE);
+                        let grid_z = start_z + (iz as f32 * SECTOR_SIZE);
+                        let test_pos = Vec3::new(grid_x + SECTOR_SIZE / 2.0, target_y, grid_z + SECTOR_SIZE / 2.0);
+
+                        if let Some((sx, sy)) = world_to_screen(test_pos, state.camera_3d.position,
+                            state.camera_3d.basis_x, state.camera_3d.basis_y, state.camera_3d.basis_z,
+                            fb.width, fb.height)
+                        {
+                            let dist = ((mouse_fb_x - sx).powi(2) + (mouse_fb_y - sy).powi(2)).sqrt();
+                            if closest.map_or(true, |(_, _, best_dist)| dist < best_dist) {
+                                closest = Some((grid_x, grid_z, dist));
+                            }
+                        }
+                    }
+                }
+
+                if let Some((x, z, dist)) = closest {
+                    if dist < 100.0 {
+                        (x, z)
+                    } else {
+                        // Too far from any grid position
+                        (f32::NAN, f32::NAN)
+                    }
+                } else {
+                    (f32::NAN, f32::NAN)
+                }
+            };
+
             // Handle Shift+drag for height adjustment
             let shift_down = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
 
-            if shift_down && !state.height_adjust_mode {
-                // Just started holding shift - enter height adjust mode
+            if shift_down && !state.height_adjust_mode && !snapped_x.is_nan() {
+                // Just started holding shift - enter height adjust mode and lock position
                 state.height_adjust_mode = true;
                 state.height_adjust_start_mouse_y = mouse_pos.1;
                 state.height_adjust_start_y = state.placement_target_y;
+                state.height_adjust_locked_pos = Some((snapped_x, snapped_z));
             } else if !shift_down && state.height_adjust_mode {
-                // Released shift - exit height adjust mode
+                // Released shift - exit height adjust mode and unlock position
                 state.height_adjust_mode = false;
+                state.height_adjust_locked_pos = None;
             }
 
             // Adjust height while shift is held
@@ -505,59 +558,33 @@ pub fn draw_viewport_3d(
                 state.set_status(&format!("Height: {:.0} ({} clicks)", state.placement_target_y, clicks), 0.5);
             }
 
-            // Use placement_target_y, but initialize to sensible default if zero
-            let target_y = if state.placement_target_y == 0.0 && !state.height_adjust_mode {
-                // Default: floor at 0, ceiling at CEILING_HEIGHT
-                if is_floor { 0.0 } else { CEILING_HEIGHT }
-            } else {
-                state.placement_target_y
-            };
-
-            let search_radius = 20;
-            let cam_x = state.camera_3d.position.x;
-            let cam_z = state.camera_3d.position.z;
-            let start_x = ((cam_x / SECTOR_SIZE).floor() as i32 - search_radius) as f32 * SECTOR_SIZE;
-            let start_z = ((cam_z / SECTOR_SIZE).floor() as i32 - search_radius) as f32 * SECTOR_SIZE;
-
-            let mut closest: Option<(f32, f32, f32)> = None;
-            for ix in 0..(search_radius * 2) {
-                for iz in 0..(search_radius * 2) {
-                    let grid_x = start_x + (ix as f32 * SECTOR_SIZE);
-                    let grid_z = start_z + (iz as f32 * SECTOR_SIZE);
-                    let test_pos = Vec3::new(grid_x + SECTOR_SIZE / 2.0, target_y, grid_z + SECTOR_SIZE / 2.0);
-
-                    if let Some((sx, sy)) = world_to_screen(test_pos, state.camera_3d.position,
-                        state.camera_3d.basis_x, state.camera_3d.basis_y, state.camera_3d.basis_z,
-                        fb.width, fb.height)
-                    {
-                        let dist = ((mouse_fb_x - sx).powi(2) + (mouse_fb_y - sy).powi(2)).sqrt();
-                        if closest.map_or(true, |(_, _, best_dist)| dist < best_dist) {
-                            closest = Some((grid_x, grid_z, dist));
-                        }
-                    }
-                }
-            }
-
-            if let Some((snapped_x, snapped_z, dist)) = closest {
-                if dist < 100.0 {
-                    // Check if sector is occupied using new sector API
-                    let occupied = if let Some(room) = state.level.rooms.get(state.current_room) {
-                        // Convert world coords to grid coords
-                        if let Some((gx, gz)) = room.world_to_grid(snapped_x + SECTOR_SIZE * 0.5, snapped_z + SECTOR_SIZE * 0.5) {
-                            if let Some(sector) = room.get_sector(gx, gz) {
-                                if is_floor { sector.floor.is_some() } else { sector.ceiling.is_some() }
-                            } else {
-                                false
-                            }
+            // Set preview sector if we have a valid position
+            if !snapped_x.is_nan() {
+                // Check if sector is occupied using new sector API
+                let occupied = if let Some(room) = state.level.rooms.get(state.current_room) {
+                    // Convert world coords to grid coords
+                    if let Some((gx, gz)) = room.world_to_grid(snapped_x + SECTOR_SIZE * 0.5, snapped_z + SECTOR_SIZE * 0.5) {
+                        if let Some(sector) = room.get_sector(gx, gz) {
+                            if is_floor { sector.floor.is_some() } else { sector.ceiling.is_some() }
                         } else {
                             false
                         }
                     } else {
                         false
-                    };
+                    }
+                } else {
+                    false
+                };
 
-                    preview_sector = Some((snapped_x, snapped_z, target_y, occupied));
-                }
+                // Use current target_y for preview (may have been updated by height adjust)
+                let preview_y = state.placement_target_y;
+                let final_y = if preview_y == 0.0 && !state.height_adjust_mode {
+                    if is_floor { 0.0 } else { CEILING_HEIGHT }
+                } else {
+                    preview_y
+                };
+
+                preview_sector = Some((snapped_x, snapped_z, final_y, occupied));
             }
         }
     }

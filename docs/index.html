@@ -356,6 +356,12 @@
             complete: false,
             total: 0,
             loaded: 0,
+            timings: {
+                startTime: 0,
+                fetchTime: 0,
+                decodeTime: 0,
+                totalBytes: 0
+            },
 
             isComplete: function() {
                 return TextureCache.complete ? 1 : 0;

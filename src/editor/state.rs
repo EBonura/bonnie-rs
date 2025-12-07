@@ -169,6 +169,7 @@ pub struct EditorState {
     pub height_adjust_mode: bool,          // True when Shift is held for height adjustment
     pub height_adjust_start_mouse_y: f32,  // Mouse Y when height adjust started
     pub height_adjust_start_y: f32,        // placement_target_y when height adjust started
+    pub height_adjust_locked_pos: Option<(f32, f32)>, // Locked (x, z) position when adjusting
 
     /// Rasterizer settings (PS1 effects)
     pub raster_settings: RasterSettings,
@@ -234,6 +235,7 @@ impl EditorState {
             height_adjust_mode: false,
             height_adjust_start_mouse_y: 0.0,
             height_adjust_start_y: 0.0,
+            height_adjust_locked_pos: None,
             raster_settings: RasterSettings::default(), // backface_cull=true shows backfaces as wireframe
         }
     }
