@@ -10,6 +10,8 @@ use super::texture_pack::TexturePack;
 pub const SECTOR_SIZE: f32 = 1024.0;
 /// Height subdivision ("click") in world units (Y axis)
 pub const CLICK_HEIGHT: f32 = 256.0;
+/// Default ceiling height (2x sector size)
+pub const CEILING_HEIGHT: f32 = 2048.0;
 
 /// Current editor tool
 #[derive(Debug, Clone, Copy, PartialEq)]

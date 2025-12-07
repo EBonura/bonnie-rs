@@ -2,7 +2,7 @@
 
 use macroquad::prelude::*;
 use crate::ui::{Rect, UiContext};
-use super::{EditorState, Selection, SECTOR_SIZE};
+use super::{EditorState, Selection, SECTOR_SIZE, CEILING_HEIGHT};
 
 /// Point-in-triangle test using barycentric coordinates
 fn point_in_triangle(px: f32, py: f32, v0: (f32, f32), v1: (f32, f32), v2: (f32, f32)) -> bool {
@@ -509,7 +509,7 @@ pub fn draw_grid_view(ctx: &mut UiContext, rect: Rect, state: &mut EditorState) 
                             state.save_undo();
 
                             if let Some(room) = state.level.rooms.get_mut(current_room_idx) {
-                                let ceiling_height = 1024.0; // 4 clicks
+                                let ceiling_height = CEILING_HEIGHT;
 
                                 // Add 4 vertices for the ceiling quad (reversed winding for downward-facing normal)
                                 let v0 = room.add_vertex(snapped_x, ceiling_height, snapped_z);

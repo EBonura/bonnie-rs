@@ -6,7 +6,7 @@ use crate::rasterizer::{
     Framebuffer, Texture as RasterTexture, render_mesh, Color as RasterColor, Vec3,
     perspective_transform, WIDTH, HEIGHT, WIDTH_HI, HEIGHT_HI,
 };
-use super::{EditorState, Selection, CLICK_HEIGHT};
+use super::{EditorState, EditorTool, Selection, CLICK_HEIGHT};
 
 /// Project a world-space point to framebuffer coordinates
 fn world_to_screen(
@@ -183,8 +183,9 @@ pub fn draw_viewport_3d(
     }
 
     // Find vertex under mouse cursor (for picking/dragging)
+    // Only detect vertices in Select mode - not in placement modes
     let mut hovered_vertex: Option<(usize, usize, f32)> = None; // (room_idx, vertex_idx, screen_dist)
-    if inside_viewport && !ctx.mouse.right_down {
+    if inside_viewport && !ctx.mouse.right_down && state.tool == EditorTool::Select {
         if let Some((fb_x, fb_y)) = screen_to_fb(mouse_pos.0, mouse_pos.1) {
             for (room_idx, room) in state.level.rooms.iter().enumerate() {
                 for (vert_idx, vert) in room.vertices.iter().enumerate() {
@@ -212,8 +213,9 @@ pub fn draw_viewport_3d(
     }
 
     // Find edge under mouse cursor (lower priority than vertex)
+    // Only detect edges in Select mode - not in placement modes
     let mut hovered_edge: Option<(usize, usize, usize, f32)> = None; // (room_idx, v0_idx, v1_idx, distance)
-    if inside_viewport && !ctx.mouse.right_down && hovered_vertex.is_none() {
+    if inside_viewport && !ctx.mouse.right_down && hovered_vertex.is_none() && state.tool == EditorTool::Select {
         if let Some((mouse_fb_x, mouse_fb_y)) = screen_to_fb(mouse_pos.0, mouse_pos.1) {
             const EDGE_THRESHOLD: f32 = 8.0; // Pixels
 
@@ -316,12 +318,74 @@ pub fn draw_viewport_3d(
         }
     }
 
+    // Find preview sector for floor/ceiling placement mode
+    // This runs every frame to show wireframe preview
+    let mut preview_sector: Option<(f32, f32, f32, bool)> = None; // (x, z, target_y, is_occupied)
+    if inside_viewport && (state.tool == EditorTool::DrawFloor || state.tool == EditorTool::DrawCeiling) {
+        if let Some((mouse_fb_x, mouse_fb_y)) = screen_to_fb(mouse_pos.0, mouse_pos.1) {
+            use super::{SECTOR_SIZE, CEILING_HEIGHT};
+            use crate::world::FaceType;
+
+            let target_y = if state.tool == EditorTool::DrawFloor { 0.0 } else { CEILING_HEIGHT };
+            let face_type = if state.tool == EditorTool::DrawFloor { FaceType::Floor } else { FaceType::Ceiling };
+
+            let search_radius = 20;
+            let cam_x = state.camera_3d.position.x;
+            let cam_z = state.camera_3d.position.z;
+            let start_x = ((cam_x / SECTOR_SIZE).floor() as i32 - search_radius) as f32 * SECTOR_SIZE;
+            let start_z = ((cam_z / SECTOR_SIZE).floor() as i32 - search_radius) as f32 * SECTOR_SIZE;
+
+            let mut closest: Option<(f32, f32, f32)> = None;
+            for ix in 0..(search_radius * 2) {
+                for iz in 0..(search_radius * 2) {
+                    let grid_x = start_x + (ix as f32 * SECTOR_SIZE);
+                    let grid_z = start_z + (iz as f32 * SECTOR_SIZE);
+                    let test_pos = Vec3::new(grid_x + SECTOR_SIZE / 2.0, target_y, grid_z + SECTOR_SIZE / 2.0);
+
+                    if let Some((sx, sy)) = world_to_screen(test_pos, state.camera_3d.position,
+                        state.camera_3d.basis_x, state.camera_3d.basis_y, state.camera_3d.basis_z,
+                        fb.width, fb.height)
+                    {
+                        let dist = ((mouse_fb_x - sx).powi(2) + (mouse_fb_y - sy).powi(2)).sqrt();
+                        if closest.map_or(true, |(_, _, best_dist)| dist < best_dist) {
+                            closest = Some((grid_x, grid_z, dist));
+                        }
+                    }
+                }
+            }
+
+            if let Some((snapped_x, snapped_z, dist)) = closest {
+                if dist < 100.0 {
+                    // Check if sector is occupied
+                    let occupied = if let Some(room) = state.level.rooms.get(state.current_room) {
+                        room.faces.iter().any(|face| {
+                            if face.face_type != face_type { return false; }
+                            let num_verts = if face.is_triangle { 3 } else { 4 };
+                            let mut cx = 0.0;
+                            let mut cz = 0.0;
+                            for i in 0..num_verts {
+                                let v = room.vertices[face.indices[i]];
+                                cx += v.x;
+                                cz += v.z;
+                            }
+                            cx /= num_verts as f32;
+                            cz /= num_verts as f32;
+                            const EPSILON: f32 = 1.0;
+                            cx >= snapped_x + EPSILON && cx < snapped_x + SECTOR_SIZE - EPSILON &&
+                            cz >= snapped_z + EPSILON && cz < snapped_z + SECTOR_SIZE - EPSILON
+                        })
+                    } else { false };
+
+                    preview_sector = Some((snapped_x, snapped_z, target_y, occupied));
+                }
+            }
+        }
+    }
+
     // Handle selection and dragging based on what's hovered
     if inside_viewport && !ctx.mouse.right_down {
         // Start dragging or select on left press
         if ctx.mouse.left_pressed {
-            use crate::editor::EditorTool;
-
             // Only handle selection/dragging in Select mode
             // Drawing tools don't work in 3D view (use 2D grid view instead)
             if state.tool == EditorTool::Select {
@@ -506,133 +570,36 @@ pub fn draw_viewport_3d(
             }
             } // end of if state.tool == EditorTool::Select
             else if state.tool == EditorTool::DrawFloor || state.tool == EditorTool::DrawCeiling {
-                // Use grid search method to find where to place floor/ceiling
-                // This mirrors the vertex hover detection approach for accuracy
-                if let Some((mouse_fb_x, mouse_fb_y)) = screen_to_fb(mouse_pos.0, mouse_pos.1) {
-                    // Determine target plane height
-                    let target_y = if state.tool == EditorTool::DrawFloor {
-                        0.0
-                    } else {
-                        1024.0 // Ceiling height
-                    };
-
+                // Use the preview_sector calculated above
+                if let Some((snapped_x, snapped_z, target_y, occupied)) = preview_sector {
                     use super::SECTOR_SIZE;
+                    use crate::world::FaceType;
 
-                    // Search grid around camera position to find closest sector to mouse
-                    let search_radius = 20; // Number of sectors to search in each direction
-                    let mut closest_sector: Option<(f32, f32, f32)> = None; // (x, z, screen_distance)
+                    let face_type = if state.tool == EditorTool::DrawFloor { FaceType::Floor } else { FaceType::Ceiling };
 
-                    // Calculate starting search position (snap camera position to grid)
-                    let cam_x = state.camera_3d.position.x;
-                    let cam_z = state.camera_3d.position.z;
-                    let start_x = ((cam_x / SECTOR_SIZE).floor() as i32 - search_radius) as f32 * SECTOR_SIZE;
-                    let start_z = ((cam_z / SECTOR_SIZE).floor() as i32 - search_radius) as f32 * SECTOR_SIZE;
+                    if occupied {
+                        let type_name = if face_type == FaceType::Floor { "floor" } else { "ceiling" };
+                        state.set_status(&format!("Sector already has a {}", type_name), 2.0);
+                    } else {
+                        state.save_undo();
 
-                    // Sample grid positions and find which projects closest to mouse
-                    for ix in 0..(search_radius * 2) {
-                        for iz in 0..(search_radius * 2) {
-                            let grid_x = start_x + (ix as f32 * SECTOR_SIZE);
-                            let grid_z = start_z + (iz as f32 * SECTOR_SIZE);
-
-                            // Test the sector's center point
-                            let test_pos = Vec3::new(
-                                grid_x + SECTOR_SIZE / 2.0,
-                                target_y,
-                                grid_z + SECTOR_SIZE / 2.0,
-                            );
-
-                            // Project to screen using the same function as vertex hover
-                            if let Some((sx, sy)) = world_to_screen(
-                                test_pos,
-                                state.camera_3d.position,
-                                state.camera_3d.basis_x,
-                                state.camera_3d.basis_y,
-                                state.camera_3d.basis_z,
-                                fb.width,
-                                fb.height,
-                            ) {
-                                // Calculate screen distance to mouse
-                                let dist = ((mouse_fb_x - sx).powi(2) + (mouse_fb_y - sy).powi(2)).sqrt();
-
-                                // Update closest if this is better
-                                if closest_sector.map_or(true, |(_, _, best_dist)| dist < best_dist) {
-                                    closest_sector = Some((grid_x, grid_z, dist));
-                                }
-                            }
-                        }
-                    }
-
-                    // Place sector at closest grid position if found within reasonable distance
-                    if let Some((snapped_x, snapped_z, dist)) = closest_sector {
-                        // Only place if mouse is reasonably close (within ~50 pixels)
-                        if dist < 100.0 {
-                            use crate::world::FaceType;
-
-                            let face_type = if state.tool == EditorTool::DrawFloor {
-                                FaceType::Floor
+                        if let Some(room) = state.level.rooms.get_mut(state.current_room) {
+                            if state.tool == EditorTool::DrawFloor {
+                                let v0 = room.add_vertex(snapped_x, target_y, snapped_z);
+                                let v1 = room.add_vertex(snapped_x, target_y, snapped_z + SECTOR_SIZE);
+                                let v2 = room.add_vertex(snapped_x + SECTOR_SIZE, target_y, snapped_z + SECTOR_SIZE);
+                                let v3 = room.add_vertex(snapped_x + SECTOR_SIZE, target_y, snapped_z);
+                                room.add_quad_textured(v0, v1, v2, v3, state.selected_texture.clone(), FaceType::Floor);
+                                room.recalculate_bounds();
+                                state.set_status("Created floor sector", 2.0);
                             } else {
-                                FaceType::Ceiling
-                            };
-
-                            // Check if a floor/ceiling already exists at this sector position
-                            let sector_occupied = if let Some(room) = state.level.rooms.get(state.current_room) {
-                                room.faces.iter().any(|face| {
-                                    // Only check faces of the same type
-                                    if face.face_type != face_type {
-                                        return false;
-                                    }
-
-                                    // Calculate the center of the existing face
-                                    let num_verts = if face.is_triangle { 3 } else { 4 };
-                                    let mut center_x = 0.0;
-                                    let mut center_z = 0.0;
-                                    for i in 0..num_verts {
-                                        let v = room.vertices[face.indices[i]];
-                                        center_x += v.x;
-                                        center_z += v.z;
-                                    }
-                                    center_x /= num_verts as f32;
-                                    center_z /= num_verts as f32;
-
-                                    // Check if this face's center is within the sector we're trying to place
-                                    // A sector occupies [x, x+1024] x [z, z+1024]
-                                    const EPSILON: f32 = 1.0;
-                                    center_x >= snapped_x + EPSILON && center_x < snapped_x + SECTOR_SIZE - EPSILON &&
-                                    center_z >= snapped_z + EPSILON && center_z < snapped_z + SECTOR_SIZE - EPSILON
-                                })
-                            } else {
-                                false
-                            };
-
-                            if sector_occupied {
-                                let type_name = if face_type == FaceType::Floor { "floor" } else { "ceiling" };
-                                state.set_status(&format!("Sector already has a {}", type_name), 2.0);
-                            } else {
-                                state.save_undo();
-
-                                if let Some(room) = state.level.rooms.get_mut(state.current_room) {
-                                    if state.tool == EditorTool::DrawFloor {
-                                        // Add floor sector vertices
-                                        let v0 = room.add_vertex(snapped_x, target_y, snapped_z);
-                                        let v1 = room.add_vertex(snapped_x, target_y, snapped_z + SECTOR_SIZE);
-                                        let v2 = room.add_vertex(snapped_x + SECTOR_SIZE, target_y, snapped_z + SECTOR_SIZE);
-                                        let v3 = room.add_vertex(snapped_x + SECTOR_SIZE, target_y, snapped_z);
-
-                                        room.add_quad_textured(v0, v1, v2, v3, state.selected_texture.clone(), FaceType::Floor);
-                                        room.recalculate_bounds();
-                                        state.set_status("Created floor sector", 2.0);
-                                    } else {
-                                        // Add ceiling sector vertices (reversed winding)
-                                        let v0 = room.add_vertex(snapped_x, target_y, snapped_z);
-                                        let v1 = room.add_vertex(snapped_x + SECTOR_SIZE, target_y, snapped_z);
-                                        let v2 = room.add_vertex(snapped_x + SECTOR_SIZE, target_y, snapped_z + SECTOR_SIZE);
-                                        let v3 = room.add_vertex(snapped_x, target_y, snapped_z + SECTOR_SIZE);
-
-                                        room.add_quad_textured(v0, v1, v2, v3, state.selected_texture.clone(), FaceType::Ceiling);
-                                        room.recalculate_bounds();
-                                        state.set_status("Created ceiling sector", 2.0);
-                                    }
-                                }
+                                let v0 = room.add_vertex(snapped_x, target_y, snapped_z);
+                                let v1 = room.add_vertex(snapped_x + SECTOR_SIZE, target_y, snapped_z);
+                                let v2 = room.add_vertex(snapped_x + SECTOR_SIZE, target_y, snapped_z + SECTOR_SIZE);
+                                let v3 = room.add_vertex(snapped_x, target_y, snapped_z + SECTOR_SIZE);
+                                room.add_quad_textured(v0, v1, v2, v3, state.selected_texture.clone(), FaceType::Ceiling);
+                                room.recalculate_bounds();
+                                state.set_status("Created ceiling sector", 2.0);
                             }
                         }
                     }
@@ -809,39 +776,41 @@ pub fn draw_viewport_3d(
         render_mesh(fb, &vertices, &faces, textures, &state.camera_3d, settings);
     }
 
-    // Draw vertex overlays directly into framebuffer
+    // Draw vertex overlays directly into framebuffer (only in Select mode)
     use crate::rasterizer::Color as RasterColor;
 
-    for (room_idx, room) in state.level.rooms.iter().enumerate() {
-        for (vert_idx, vert) in room.vertices.iter().enumerate() {
-            let world_pos = *vert + room.position;
-            if let Some((fb_x, fb_y)) = world_to_screen(
-                world_pos,
-                state.camera_3d.position,
-                state.camera_3d.basis_x,
-                state.camera_3d.basis_y,
-                state.camera_3d.basis_z,
-                fb.width,
-                fb.height,
-            ) {
-                let is_selected = matches!(state.selection, Selection::Vertex { room: r, vertex: v } if r == room_idx && v == vert_idx);
-                let is_hovered = hovered_vertex.map_or(false, |(ri, vi, _)| ri == room_idx && vi == vert_idx);
-                let is_dragging = state.viewport_dragging_vertices.contains(&(room_idx, vert_idx));
+    if state.tool == EditorTool::Select {
+        for (room_idx, room) in state.level.rooms.iter().enumerate() {
+            for (vert_idx, vert) in room.vertices.iter().enumerate() {
+                let world_pos = *vert + room.position;
+                if let Some((fb_x, fb_y)) = world_to_screen(
+                    world_pos,
+                    state.camera_3d.position,
+                    state.camera_3d.basis_x,
+                    state.camera_3d.basis_y,
+                    state.camera_3d.basis_z,
+                    fb.width,
+                    fb.height,
+                ) {
+                    let is_selected = matches!(state.selection, Selection::Vertex { room: r, vertex: v } if r == room_idx && v == vert_idx);
+                    let is_hovered = hovered_vertex.map_or(false, |(ri, vi, _)| ri == room_idx && vi == vert_idx);
+                    let is_dragging = state.viewport_dragging_vertices.contains(&(room_idx, vert_idx));
 
-                // Choose color based on state
-                let color = if is_selected || is_dragging {
-                    RasterColor::new(100, 255, 100) // Green when selected/dragging
-                } else if is_hovered {
-                    RasterColor::new(255, 200, 150) // Orange when hovered
-                } else {
-                    RasterColor::with_alpha(200, 200, 220, 200) // Default (slightly transparent)
-                };
+                    // Choose color based on state
+                    let color = if is_selected || is_dragging {
+                        RasterColor::new(100, 255, 100) // Green when selected/dragging
+                    } else if is_hovered {
+                        RasterColor::new(255, 200, 150) // Orange when hovered
+                    } else {
+                        RasterColor::with_alpha(200, 200, 220, 200) // Default (slightly transparent)
+                    };
 
-                // Choose radius
-                let radius = if is_selected || is_hovered { 5 } else { 3 };
+                    // Choose radius (smaller overall)
+                    let radius = if is_selected || is_hovered { 4 } else { 2 };
 
-                // Draw circle directly into framebuffer
-                fb.draw_circle(fb_x as i32, fb_y as i32, radius, color);
+                    // Draw circle directly into framebuffer
+                    fb.draw_circle(fb_x as i32, fb_y as i32, radius, color);
+                }
             }
         }
     }
@@ -938,6 +907,121 @@ pub fn draw_viewport_3d(
                         fb.draw_circle(*x, *y, 4, highlight_color);
                     }
                 }
+            }
+        }
+    }
+
+    // Draw floor/ceiling placement preview wireframe with vertical sector boundaries
+    if let Some((snapped_x, snapped_z, target_y, occupied)) = preview_sector {
+        use super::{SECTOR_SIZE, CEILING_HEIGHT};
+
+        // Floor and ceiling heights for vertical lines
+        let floor_y = 0.0;
+        let ceiling_y = CEILING_HEIGHT;
+
+        // Four corners at the target plane (floor or ceiling being placed)
+        let corners = [
+            Vec3::new(snapped_x, target_y, snapped_z),
+            Vec3::new(snapped_x, target_y, snapped_z + SECTOR_SIZE),
+            Vec3::new(snapped_x + SECTOR_SIZE, target_y, snapped_z + SECTOR_SIZE),
+            Vec3::new(snapped_x + SECTOR_SIZE, target_y, snapped_z),
+        ];
+
+        // Four corners at floor level (for vertical lines)
+        let floor_corners = [
+            Vec3::new(snapped_x, floor_y, snapped_z),
+            Vec3::new(snapped_x, floor_y, snapped_z + SECTOR_SIZE),
+            Vec3::new(snapped_x + SECTOR_SIZE, floor_y, snapped_z + SECTOR_SIZE),
+            Vec3::new(snapped_x + SECTOR_SIZE, floor_y, snapped_z),
+        ];
+
+        // Four corners at ceiling level (for vertical lines)
+        let ceiling_corners = [
+            Vec3::new(snapped_x, ceiling_y, snapped_z),
+            Vec3::new(snapped_x, ceiling_y, snapped_z + SECTOR_SIZE),
+            Vec3::new(snapped_x + SECTOR_SIZE, ceiling_y, snapped_z + SECTOR_SIZE),
+            Vec3::new(snapped_x + SECTOR_SIZE, ceiling_y, snapped_z),
+        ];
+
+        // Project corners to screen
+        let mut screen_corners = Vec::new();
+        let mut screen_floor = Vec::new();
+        let mut screen_ceiling = Vec::new();
+
+        for corner in &corners {
+            if let Some((sx, sy)) = world_to_screen(*corner, state.camera_3d.position,
+                state.camera_3d.basis_x, state.camera_3d.basis_y, state.camera_3d.basis_z,
+                fb.width, fb.height)
+            {
+                screen_corners.push((sx as i32, sy as i32));
+            }
+        }
+
+        for corner in &floor_corners {
+            if let Some((sx, sy)) = world_to_screen(*corner, state.camera_3d.position,
+                state.camera_3d.basis_x, state.camera_3d.basis_y, state.camera_3d.basis_z,
+                fb.width, fb.height)
+            {
+                screen_floor.push((sx as i32, sy as i32));
+            }
+        }
+
+        for corner in &ceiling_corners {
+            if let Some((sx, sy)) = world_to_screen(*corner, state.camera_3d.position,
+                state.camera_3d.basis_x, state.camera_3d.basis_y, state.camera_3d.basis_z,
+                fb.width, fb.height)
+            {
+                screen_ceiling.push((sx as i32, sy as i32));
+            }
+        }
+
+        // Green for valid placement, red for occupied
+        let color = if occupied {
+            RasterColor::new(255, 80, 80)
+        } else {
+            RasterColor::new(80, 255, 80)
+        };
+        let dim_color = if occupied {
+            RasterColor::new(180, 60, 60)
+        } else {
+            RasterColor::new(60, 180, 60)
+        };
+
+        // Draw vertical boundary lines (floor to ceiling at each corner)
+        if screen_floor.len() == 4 && screen_ceiling.len() == 4 {
+            for i in 0..4 {
+                let (fx, fy) = screen_floor[i];
+                let (cx, cy) = screen_ceiling[i];
+                fb.draw_line(fx, fy, cx, cy, dim_color);
+            }
+
+            // Draw floor outline (dimmer)
+            for i in 0..4 {
+                let (x0, y0) = screen_floor[i];
+                let (x1, y1) = screen_floor[(i + 1) % 4];
+                fb.draw_line(x0, y0, x1, y1, dim_color);
+            }
+
+            // Draw ceiling outline (dimmer)
+            for i in 0..4 {
+                let (x0, y0) = screen_ceiling[i];
+                let (x1, y1) = screen_ceiling[(i + 1) % 4];
+                fb.draw_line(x0, y0, x1, y1, dim_color);
+            }
+        }
+
+        // Draw placement preview (the actual tile being placed - brighter)
+        if screen_corners.len() == 4 {
+            // Draw edges
+            for i in 0..4 {
+                let (x0, y0) = screen_corners[i];
+                let (x1, y1) = screen_corners[(i + 1) % 4];
+                fb.draw_thick_line(x0, y0, x1, y1, 2, color);
+            }
+
+            // Draw corner circles
+            for (x, y) in &screen_corners {
+                fb.draw_circle(*x, *y, 3, color);
             }
         }
     }

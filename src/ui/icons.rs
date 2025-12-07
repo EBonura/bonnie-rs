@@ -39,6 +39,7 @@ pub mod icon {
     pub const BOX: char = '\u{e061}';
     pub const LAYERS: char = '\u{e529}';
     pub const GRID: char = '\u{e0e9}';
+    pub const DOOR_CLOSED: char = '\u{e09a}';  // Portal (doorway between rooms)
 
     // PS1 effect toggles
     pub const WAVES: char = '\u{e283}';       // Affine texture mapping (warpy)

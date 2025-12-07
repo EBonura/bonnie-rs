@@ -187,8 +187,8 @@ This project uses the following free texture packs:
 ### World Editor - 3D Viewport
 
 #### High Priority (Bugs/Polish)
-- [ ] Show wireframe preview for tile placement: In floor/ceiling mode, display colored wireframe where tile will be placed
-- [ ] Show sector wireframe on hover: Display vertical lines showing sector boundaries when hovering
+- [x] Show wireframe preview for tile placement: In floor/ceiling mode, display colored wireframe where tile will be placed
+- [x] Show sector wireframe on hover: Display vertical lines showing sector boundaries when hovering
 - [ ] Add raise/lower for floor/ceiling: Way to adjust Y position when placing tiles
 - [ ] Fix texture showing as "(none)": Info pane shows `(none)` even when texture is visible in 3D view
 - [ ] Context-sensitive bottom bar: Show left/right click actions; when right-clicking show WASD/QE bindings

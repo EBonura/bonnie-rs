@@ -177,9 +177,9 @@ fn draw_unified_toolbar(ctx: &mut UiContext, rect: Rect, state: &mut EditorState
     let tools = [
         (icon::MOVE, "Select", EditorTool::Select),
         (icon::SQUARE, "Floor", EditorTool::DrawFloor),
-        (icon::LAYERS, "Wall", EditorTool::DrawWall),
-        (icon::BOX, "Ceiling", EditorTool::DrawCeiling),
-        (icon::GRID, "Portal", EditorTool::PlacePortal),
+        (icon::BOX, "Wall", EditorTool::DrawWall),
+        (icon::LAYERS, "Ceiling", EditorTool::DrawCeiling),
+        (icon::DOOR_CLOSED, "Portal", EditorTool::PlacePortal),
     ];
 
     for (icon_char, tooltip, tool) in tools {
