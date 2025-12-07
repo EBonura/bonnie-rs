@@ -3,7 +3,7 @@
 //! Displays introduction, motivation, and FAQ for Bonnie Engine.
 
 use macroquad::prelude::*;
-use crate::ui::Rect;
+use crate::ui::{Rect, draw_link_row};
 use crate::VERSION;
 
 /// Colors matching the editor theme
@@ -81,9 +81,13 @@ pub fn draw_landing(rect: Rect, state: &mut LandingState) {
 
     // === WHY SECTION ===
     y = draw_section(content_x, y, content_width, "Why build this?", &[
-        "Mostly to answer the question: what would a Souls-like have looked like on a PS1?",
+        "It started with a question: what would a Souls-like have looked like on a PS1?",
         "There are great examples like Bloodborne PSX by Lilith Walther, built in Unity.",
         "I wanted to try my own approach from scratch.",
+        "",
+        "But I can see this expanding beyond Souls-like games. The engine could support",
+        "tactical RPGs (think FF Tactics), platformers, survival horror, or any genre that",
+        "benefits from the PS1 aesthetic. The goal is a flexible creative tool.",
         "",
         "Modern retro-style games typically achieve the aesthetic top-down with shaders",
         "and post-processing, often with great results. I wanted to try the opposite: a",
@@ -93,6 +97,20 @@ pub fn draw_landing(rect: Rect, state: &mut LandingState) {
         "coding for actual PS1 hardware. Each had limitations - primitive SDKs, distribution",
         "headaches, or not enough flexibility. Rust + WASM turned out to be the sweet spot:",
         "native performance, browser deployment, and a modern toolchain.",
+    ]);
+
+    // === WHERE TO START SECTION ===
+    y = draw_section(content_x, y, content_width, "Where to start", &[
+        "Use the tabs at the top to switch between the available tools:",
+        "",
+        "World - Build levels with floors, ceilings, walls, and portals. Inspired by the",
+        "Tomb Raider Level Editor (TRLE), with a 2D grid view and 3D preview.",
+        "",
+        "Assets - Create and animate 3D models, props, and characters using PS1-style",
+        "segmented animation. Each body part is a separate mesh that can be keyframed.",
+        "",
+        "Music - Compose music using a pattern-based tracker. Supports SF2 soundfonts",
+        "with 8 channels and classic tracker effects.",
     ]);
 
     // === FAQ SECTION ===
@@ -111,7 +129,7 @@ pub fn draw_landing(rect: Rect, state: &mut LandingState) {
 
     y = draw_faq_item(content_x, y, content_width,
         "Will this be on Steam?",
-        "Probably! The native build is intended for Steam distribution.\nThe web version may be offered as a free demo or a SaaS product - not to\nmonetize, just to cover hosting costs if the userbase grows.",
+        "Probably! The native build is intended for Steam distribution.\nThe web version may be offered as a free demo or a SaaS product - not to\nmonetize, just to cover hosting costs if the userbase grows.\n\nThis will always be fully open source. Even if there's a paid Steam version,\nyou can always clone the repo and build it yourself for free.",
     );
 
     y = draw_faq_item(content_x, y, content_width,
@@ -131,7 +149,26 @@ pub fn draw_landing(rect: Rect, state: &mut LandingState) {
 
     // === FOOTER ===
     y += 20.0;
-    draw_text("Made with love and Rust", content_x, y + 16.0, 16.0, MUTED_COLOR);
+    draw_text("Created by Emanuele Bonura", content_x, y + 16.0, 16.0, TEXT_COLOR);
+    y += 28.0;
+
+    // Clickable links row
+    let link_color = MUTED_COLOR;
+    let hover_color = ACCENT_COLOR;
+    draw_link_row(
+        content_x,
+        y + 14.0,
+        &[
+            ("GitHub", "https://github.com/EBonura/bonnie-engine"),
+            ("itch.io", "https://bonnie-games.itch.io/"),
+            ("Buy Me a Coffee", "https://buymeacoffee.com/bonniegames"),
+        ],
+        "  |  ",
+        14.0,
+        link_color,
+        hover_color,
+        MUTED_COLOR,
+    );
     y += 30.0;
 
     // Clamp scroll to content

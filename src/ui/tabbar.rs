@@ -38,15 +38,32 @@ pub mod layout {
     pub const INDICATOR_HEIGHT: f32 = 2.0;
     /// Font size for tab labels
     pub const FONT_SIZE: f32 = 14.0;
+    /// Icon size
+    pub const ICON_SIZE: f32 = 14.0;
+    /// Spacing between icon and label
+    pub const ICON_LABEL_GAP: f32 = 6.0;
 }
 
-/// Draw a fixed tab bar with the given labels
+/// A tab entry with icon and label
+pub struct TabEntry {
+    pub icon: char,
+    pub label: &'static str,
+}
+
+impl TabEntry {
+    pub const fn new(icon: char, label: &'static str) -> Self {
+        Self { icon, label }
+    }
+}
+
+/// Draw a fixed tab bar with icons and labels
 /// Returns the index of the clicked tab, or None if no click
 pub fn draw_fixed_tabs(
     ctx: &mut UiContext,
     rect: Rect,
-    labels: &[&str],
+    tabs: &[TabEntry],
     active_index: usize,
+    icon_font: Option<&Font>,
 ) -> Option<usize> {
     // Draw bar background
     draw_rectangle(rect.x, rect.y, rect.w, rect.h, style::BAR_BG);
@@ -60,7 +77,7 @@ pub fn draw_fixed_tabs(
         style::TAB_BORDER,
     );
 
-    if labels.is_empty() {
+    if tabs.is_empty() {
         return None;
     }
 
@@ -70,10 +87,12 @@ pub fn draw_fixed_tabs(
     let y = rect.y.round();
     let h = rect.h.round();
 
-    for (i, label) in labels.iter().enumerate() {
+    for (i, tab) in tabs.iter().enumerate() {
         // Measure text to size tab - round width to integer to prevent accumulation of fractional pixels
-        let text_dims = measure_text(label, None, layout::FONT_SIZE as u16, 1.0);
-        let tab_width = (text_dims.width + layout::TAB_PADDING_H * 2.0).round();
+        let text_dims = measure_text(tab.label, None, layout::FONT_SIZE as u16, 1.0);
+        // Tab width: padding + icon + gap + text + padding
+        let content_width = layout::ICON_SIZE + layout::ICON_LABEL_GAP + text_dims.width;
+        let tab_width = (content_width + layout::TAB_PADDING_H * 2.0).round();
 
         let tab_rect = Rect::new(x, y, tab_width, h);
         let is_active = i == active_index;
@@ -111,17 +130,39 @@ pub fn draw_fixed_tabs(
             );
         }
 
-        // Draw label centered with crisp rendering
-        let text_color = if is_active {
+        // Colors for icon and text
+        let content_color = if is_active {
             style::TAB_ACTIVE_TEXT
         } else {
             style::TAB_INACTIVE_TEXT
         };
 
-        let text_x = (tab_rect.x + (tab_rect.w - text_dims.width) * 0.5).round();
-        let text_y = (tab_rect.y + (tab_rect.h + text_dims.height) * 0.5 - 2.0).round();
+        // Calculate vertical center of tab
+        let center_y = tab_rect.y + tab_rect.h * 0.5;
+
+        // Content starts at padding from left edge
+        let content_start_x = tab_rect.x + layout::TAB_PADDING_H;
+
+        // Draw icon centered vertically (icon draws from baseline, so offset by half icon size)
+        let icon_x = content_start_x;
+        let icon_y = (center_y + layout::ICON_SIZE * 0.5).round();
         draw_text_ex(
-            label,
+            &tab.icon.to_string(),
+            icon_x.round(),
+            icon_y,
+            TextParams {
+                font: icon_font,
+                font_size: layout::ICON_SIZE as u16,
+                color: content_color,
+                ..Default::default()
+            },
+        );
+
+        // Draw label after icon, also centered vertically
+        let text_x = (content_start_x + layout::ICON_SIZE + layout::ICON_LABEL_GAP).round();
+        let text_y = (center_y + text_dims.height * 0.5 - 1.0).round();
+        draw_text_ex(
+            tab.label,
             text_x,
             text_y,
             TextParams {
@@ -129,7 +170,7 @@ pub fn draw_fixed_tabs(
                 font_size: layout::FONT_SIZE as u16,
                 font_scale: 1.0,
                 font_scale_aspect: 1.0,
-                color: text_color,
+                color: content_color,
                 ..Default::default()
             },
         );

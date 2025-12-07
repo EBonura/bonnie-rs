@@ -31,9 +31,9 @@ impl Tool {
     pub fn label(&self) -> &'static str {
         match self {
             Tool::Home => "Home",
-            Tool::WorldEditor => "World Editor",
-            Tool::Modeler => "Modeler",
-            Tool::Tracker => "Music Editor",
+            Tool::WorldEditor => "World",
+            Tool::Modeler => "Assets",
+            Tool::Tracker => "Music",
         }
     }
 

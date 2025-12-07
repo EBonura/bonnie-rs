@@ -3,6 +3,86 @@
 use macroquad::prelude::*;
 use super::{Rect, UiContext, draw_icon_centered};
 
+// =============================================================================
+// Clickable Link Widget
+// =============================================================================
+
+/// Result of drawing a clickable link
+pub struct LinkResult {
+    /// The bounding rect of the link (for layout)
+    pub rect: Rect,
+    /// Whether the link was clicked
+    pub clicked: bool,
+}
+
+/// Draw a clickable text link that opens a URL when clicked
+/// Returns the link rect for layout purposes and whether it was clicked
+pub fn draw_link(
+    x: f32,
+    y: f32,
+    text: &str,
+    url: &str,
+    font_size: f32,
+    color: Color,
+    hover_color: Color,
+) -> LinkResult {
+    let dims = measure_text(text, None, font_size as u16, 1.0);
+    let link_rect = Rect::new(x, y - dims.height, dims.width, dims.height + 4.0);
+
+    let (mx, my) = mouse_position();
+    let hovered = link_rect.contains(mx, my);
+    let clicked = hovered && is_mouse_button_pressed(MouseButton::Left);
+
+    // Draw text with appropriate color
+    let draw_color = if hovered { hover_color } else { color };
+    draw_text(text, x, y, font_size, draw_color);
+
+    // Draw underline when hovered
+    if hovered {
+        draw_line(x, y + 2.0, x + dims.width, y + 2.0, 1.0, draw_color);
+    }
+
+    // Open URL if clicked
+    if clicked {
+        let _ = webbrowser::open(url);
+    }
+
+    LinkResult {
+        rect: link_rect,
+        clicked,
+    }
+}
+
+/// Draw a row of links separated by a separator string
+/// Returns the total width used
+pub fn draw_link_row(
+    x: f32,
+    y: f32,
+    links: &[(&str, &str)], // (text, url) pairs
+    separator: &str,
+    font_size: f32,
+    color: Color,
+    hover_color: Color,
+    separator_color: Color,
+) -> f32 {
+    let mut cursor_x = x;
+    let sep_dims = measure_text(separator, None, font_size as u16, 1.0);
+
+    for (i, (text, url)) in links.iter().enumerate() {
+        // Draw separator before all but first link
+        if i > 0 {
+            draw_text(separator, cursor_x, y, font_size, separator_color);
+            cursor_x += sep_dims.width;
+        }
+
+        // Draw link
+        let result = draw_link(cursor_x, y, text, url, font_size, color, hover_color);
+        cursor_x += result.rect.w;
+    }
+
+    cursor_x - x // Return total width
+}
+
 /// Simple toolbar layout helper
 pub struct Toolbar {
     rect: Rect,
@@ -165,8 +245,6 @@ pub fn draw_knob(
     is_bipolar: bool,
     is_editing: bool,
 ) -> KnobResult {
-    use std::f32::consts::PI;
-
     let knob_rect = Rect::new(center_x - radius, center_y - radius, radius * 2.0, radius * 2.0);
     let hovered = ctx.mouse.inside(&knob_rect);
 

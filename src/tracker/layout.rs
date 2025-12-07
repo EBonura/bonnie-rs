@@ -1,7 +1,7 @@
 //! Tracker UI layout and rendering
 
 use macroquad::prelude::*;
-use crate::ui::{Rect, UiContext, Toolbar, icon, ACCENT_COLOR, draw_knob};
+use crate::ui::{Rect, UiContext, Toolbar, icon, draw_knob};
 use super::state::{TrackerState, TrackerView};
 
 // Colors

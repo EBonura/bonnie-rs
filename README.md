@@ -3,7 +3,11 @@
 [![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/ebonura/bonnie-engine/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
+**Created by [Emanuele Bonura](https://bonnie-games.itch.io/)**
+
 **Live Demo:** [https://ebonura.github.io/bonnie-engine](https://ebonura.github.io/bonnie-engine)
+
+[GitHub](https://github.com/EBonura/bonnie-engine) | [itch.io](https://bonnie-games.itch.io/) | [Buy Me a Coffee](https://buymeacoffee.com/bonniegames)
 
 ---
 
@@ -147,6 +151,118 @@ This project uses the following free texture packs:
 - **Dark Fantasy Townhouse 64x64 Texture Pack** by Level Eleven Games
   https://level-eleven-games.itch.io/dark-fantasy-townhouse-64x64-texture-pack
 
+## Backlog
+
+### Overall / Meta
+
+#### High Priority
+- [x] Add author credit: "Created by Emanuele Bonura" with links to [GitHub](https://github.com/EBonura/bonnie-engine), [itch.io](https://bonnie-games.itch.io/), [Buy Me a Coffee](https://buymeacoffee.com/bonniegames)
+- [x] Expand Home page vision: clarify this could expand beyond Souls-like to RPG mechanics (FF Tactics style) or platformers
+- [x] Add "will always be open source" note: users can always build locally even if Steam version exists
+
+#### Medium Priority
+- [x] Add "Where to Start" section to Home page: guide users to the tabs with brief tool descriptions
+- [x] Rename tabs consistently: Home / World / Assets / Music
+
+#### Low Priority / Future
+- [ ] Remove AI/Claude mentions from git history (use `git filter-branch` or BFG Repo Cleaner - backup first!)
+- [ ] Built-in example browser: open browser window showing bundled maps/models with 3D preview (list left, 3D view right, info bottom)
+- [ ] Update itch.io page to reflect the new engine project
+
+---
+
+### Rendering Pipeline
+
+#### Critical
+- [ ] **Implement PS1 dithering**: The baseline library (tipsy) does NOT include dithering. Add ordered dithering (4x4 Bayer matrix) to the rasterizer. Should be toggleable in `RasterSettings`. Classic PS1 used this to hide color banding with 15-bit color (5 bits per RGB channel)
+
+#### High Priority
+- [ ] Fix doubled edge lines: In 3D viewport, edges appear as 2 parallel lines instead of 1
+
+#### Medium Priority
+- [ ] Add aspect ratio toggle: Currently locked to PS1 4:3 (320x240), add icon to toggle full available space (affects World Editor and Modeler)
+
+---
+
+### World Editor - 3D Viewport
+
+#### High Priority (Bugs/Polish)
+- [ ] Show wireframe preview for tile placement: In floor/ceiling mode, display colored wireframe where tile will be placed
+- [ ] Show sector wireframe on hover: Display vertical lines showing sector boundaries when hovering
+- [ ] Add raise/lower for floor/ceiling: Way to adjust Y position when placing tiles
+- [ ] Fix texture showing as "(none)": Info pane shows `(none)` even when texture is visible in 3D view
+- [ ] Context-sensitive bottom bar: Show left/right click actions; when right-clicking show WASD/QE bindings
+- [ ] Unify floor/ceiling as single "horizontal face": Same object, just different spawn height and normal direction
+- [ ] Remove "is triangle" display for floors/ceilings: Only relevant for walls
+
+#### Major Features (Missing)
+- [ ] **Implement walls functionality**: Currently completely missing
+- [ ] **Implement portals**: Create and visualize room connections (Portal struct exists in geometry.rs)
+- [ ] **Room boundary wireframe**: Display room size/boundaries as wireframe
+
+#### Future
+- [ ] Entity system design: Research TrenchBroom and Tomb Raider Level Editor for spawn points, interactables (ladders, chests, doors), triggers, lights. Each entity type configurable in properties panel
+
+---
+
+### Music Editor
+
+#### High Priority (Bugs)
+- [ ] Fix left-side knob reset bug: Knobs reset to max value when dragged on left side
+- [ ] Thicken knob perimeter: Circle outline too thin for easy reading
+- [ ] Fix piano key highlighting: Clicking works but doesn't show visual feedback
+- [ ] Configurable pattern length: Currently hardcoded to 64 rows - should be adjustable
+- [ ] Fix Pause icon: Currently shows pen icon instead of pause
+- [ ] Fix Arrangement icon: Shows lock instead of arrangement-related icon
+- [ ] Fix Instruments icon: Shows rotating arrow - need better icon (piano/synth?)
+
+#### Medium Priority
+- [ ] Add per-note vs channel FX toggle: At top of each channel, toggle between per-note FX or channel-wide FX (with greyed-out section when not active)
+- [ ] Add bottom status bar: Same as World Editor, context-sensitive shortcuts/suggestions
+
+#### Future
+- [ ] Custom instrument editor: Tab for building custom instruments beyond SF2 soundfonts
+
+---
+
+### Assets
+
+#### High Priority
+- [ ] Fix transform tool icons: Select/Move/Rotate/Scale all show the same select icon
+
+#### Medium Priority
+- [ ] Add PS1 aspect ratio toggle: Same feature as World Editor
+
+#### Future
+- [ ] Pixel art painting tools: Built-in tools specific for texture painting
+- [ ] PS1 color depth constraints: Limit to PS1 palette (toggleable)
+- [ ] VRAM usage counter: PS1 had 1MB VRAM (~700-900KB available after screen buffer). Display usage with warning when exceeded
+- [ ] Polygon count indicator: Green/yellow/red based on PS1-realistic counts
+- [ ] Multi-object animation: Design system for animations where 2 objects interact (e.g., player pulling lever)
+
+---
+
+### PS1 Technical Reference
+
+For implementing authentic PS1 constraints:
+
+**VRAM:**
+- Total: 1MB (1,048,576 bytes)
+- Screen buffer (320x240x16bit): ~153,600 bytes
+- Double buffer: ~307,200 bytes
+- Available for textures: ~700-900KB
+- Textures typically 4-bit or 8-bit indexed with CLUTs
+
+**Dithering (Bayer 4x4 matrix):**
+```
+ 0/16   8/16   2/16  10/16
+12/16   4/16  14/16   6/16
+ 3/16  11/16   1/16   9/16
+15/16   7/16  13/16   5/16
+```
+
+---
+
 ## Roadmap
 
 ### Priority: Map Creation & Basic Gameplay
@@ -172,7 +288,6 @@ This project uses the following free texture packs:
 - [ ] Fog system (distance-based fade)
 
 ### Core Systems
-- [ ] Audio system with sequencer/tracker
 - [ ] Entity system (enemies, items, spawn points)
 - [ ] Inventory system
 - [ ] Save/load game state

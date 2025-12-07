@@ -22,7 +22,7 @@ mod app;
 use macroquad::prelude::*;
 use rasterizer::{Framebuffer, Texture, HEIGHT, WIDTH};
 use world::{create_empty_level, load_level, save_level};
-use ui::{UiContext, MouseState, Rect, draw_fixed_tabs, layout as tab_layout};
+use ui::{UiContext, MouseState, Rect, draw_fixed_tabs, TabEntry, layout as tab_layout, icon};
 use editor::{EditorAction, draw_editor};
 use app::{AppState, Tool};
 use std::path::PathBuf;
@@ -133,8 +133,13 @@ async fn main() {
 
         // Draw tab bar at top
         let tab_bar_rect = Rect::new(0.0, 0.0, screen_w, tab_layout::BAR_HEIGHT);
-        let labels = Tool::labels();
-        if let Some(clicked) = draw_fixed_tabs(&mut ui_ctx, tab_bar_rect, &labels, app.active_tool_index()) {
+        let tabs = [
+            TabEntry::new(icon::HOUSE, "Home"),
+            TabEntry::new(icon::GLOBE, "World"),
+            TabEntry::new(icon::PERSON_STANDING, "Assets"),
+            TabEntry::new(icon::MUSIC, "Music"),
+        ];
+        if let Some(clicked) = draw_fixed_tabs(&mut ui_ctx, tab_bar_rect, &tabs, app.active_tool_index(), app.icon_font.as_ref()) {
             if let Some(tool) = Tool::from_index(clicked) {
                 app.set_active_tool(tool);
             }

@@ -210,9 +210,9 @@ pub struct ModelerState {
 impl ModelerState {
     pub fn new() -> Self {
         let mut camera = Camera::new();
-        camera.position = Vec3::new(300.0, 200.0, 300.0);
-        camera.rotation_x = 0.4;
-        camera.rotation_y = -0.8;
+        camera.position = Vec3::new(200.0, 150.0, -300.0);
+        camera.rotation_x = 0.3;
+        camera.rotation_y = 0.8; // Rotated ~90 degrees right to face the cube
         camera.update_basis();
 
         Self {

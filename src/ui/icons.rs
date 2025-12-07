@@ -47,9 +47,14 @@ pub mod icon {
     pub const SUN: char = '\u{e178}';         // Lighting/shading
 
     // Music editor
-    pub const MUSIC: char = '\u{e127}';       // Music/notes
+    pub const MUSIC: char = '\u{e122}';       // Music/notes
     pub const PIANO: char = '\u{e2ea}';       // Piano (keyboard icon)
     pub const LIST_MUSIC: char = '\u{e10b}';  // Arrangement/playlist
+
+    // Tab bar icons
+    pub const HOUSE: char = '\u{e0f5}';           // Home tab
+    pub const GLOBE: char = '\u{e0e8}';           // World tab
+    pub const PERSON_STANDING: char = '\u{e21e}'; // Assets tab
 }
 
 /// Draw a Lucide icon centered in a rect
