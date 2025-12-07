@@ -35,3 +35,12 @@ TimGM6mb is a small (~6MB) General MIDI soundfont. It is distributed under the G
 - **Usage**: Texture pack for world editor
 
 This texture pack is released under CC0, meaning it is dedicated to the public domain with no restrictions on use.
+
+### SanaArt 64x64 Tiles
+
+- **Source**: [sanaart.net](http://sanaart.net)
+- **Author**: SanaArt
+- **License**: Free to use (as stated in the image)
+- **Usage**: Nature/water texture tiles for world editor
+
+A collection of 24 hand-painted 64x64 tiles including grass, water, cobblestone, and foliage variations.
