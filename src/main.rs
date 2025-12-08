@@ -23,7 +23,7 @@ use macroquad::prelude::*;
 use rasterizer::{Framebuffer, Texture, HEIGHT, WIDTH};
 use world::{create_empty_level, load_level, save_level};
 use ui::{UiContext, MouseState, Rect, draw_fixed_tabs, TabEntry, layout as tab_layout, icon};
-use editor::{EditorAction, draw_editor};
+use editor::{EditorAction, draw_editor, draw_example_browser, BrowserAction, discover_examples};
 use app::{AppState, Tool};
 use std::path::PathBuf;
 
@@ -48,29 +48,8 @@ async fn main() {
     // Initialize framebuffer (used by 3D viewport in editor)
     let mut fb = Framebuffer::new(WIDTH, HEIGHT);
 
-    // Load level from file, fall back to empty level
-    let level = match load_level("assets/levels/test.ron") {
-        Ok(l) => {
-            println!("Loaded level from assets/levels/test.ron");
-            l
-        }
-        Err(e) => {
-            println!("Failed to load level: {}, using empty level", e);
-            create_empty_level()
-        }
-    };
-
-    // Load textures (used by editor via texture packs)
-    let _textures = {
-        let loaded = Texture::load_directory("assets/textures/SAMPLE");
-        if loaded.is_empty() {
-            println!("No textures found, using checkerboard fallbacks");
-            Vec::<Texture>::new()
-        } else {
-            println!("Loaded {} textures", loaded.len());
-            loaded
-        }
-    };
+    // Start with empty level (user can open levels via browser)
+    let level = create_empty_level();
 
     // Mouse state tracking
     let mut last_left_down = false;
@@ -107,7 +86,6 @@ async fn main() {
     }
 
     println!("=== Bonnie Engine ===");
-    println!("Click tabs to switch between tools");
 
     loop {
         // Update UI context with mouse state
@@ -218,8 +196,58 @@ async fn main() {
                     app.icon_font.as_ref(),
                 );
 
-                // Handle editor actions
+                // Handle editor actions (including opening example browser)
                 handle_editor_action(action, ws);
+
+                // Draw example browser overlay if open
+                if ws.example_browser.open {
+                    let browser_action = draw_example_browser(
+                        &mut ui_ctx,
+                        &mut ws.example_browser,
+                        app.icon_font.as_ref(),
+                        &ws.editor_state.texture_packs,
+                        &mut fb,
+                    );
+
+                    match browser_action {
+                        BrowserAction::SelectPreview(index) => {
+                            // Load the preview synchronously
+                            if let Some(example) = ws.example_browser.examples.get(index) {
+                                let path = example.path.clone();
+                                #[cfg(not(target_arch = "wasm32"))]
+                                {
+                                    match load_level(&path) {
+                                        Ok(level) => {
+                                            println!("Loaded example level with {} rooms", level.rooms.len());
+                                            ws.example_browser.set_preview(level);
+                                        }
+                                        Err(e) => {
+                                            eprintln!("Failed to load example {}: {}", path.display(), e);
+                                            ws.editor_state.set_status(&format!("Failed to load: {}", e), 3.0);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        BrowserAction::OpenLevel => {
+                            // Load the selected level with its file path preserved
+                            if let Some(level) = ws.example_browser.preview_level.take() {
+                                let (name, path) = ws.example_browser.selected_example()
+                                    .map(|e| (e.name.clone(), e.path.clone()))
+                                    .unwrap_or_else(|| ("example".to_string(), PathBuf::from("assets/levels/untitled.ron")));
+                                ws.editor_layout.apply_config(&level.editor_layout);
+                                // Use with_file to preserve the file path for saving
+                                ws.editor_state = editor::EditorState::with_file(level, path);
+                                ws.editor_state.set_status(&format!("Opened: {}", name), 3.0);
+                                ws.example_browser.close();
+                            }
+                        }
+                        BrowserAction::Cancel => {
+                            ws.example_browser.close();
+                        }
+                        BrowserAction::None => {}
+                    }
+                }
             }
 
             Tool::Modeler => {
@@ -414,6 +442,12 @@ fn handle_editor_action(action: EditorAction, ws: &mut app::WorldEditorState) {
                     ws.editor_state.set_status(&format!("Load failed: {}", e), 5.0);
                 }
             }
+        }
+        EditorAction::BrowseExamples => {
+            // Open the level browser
+            let levels = discover_examples();
+            ws.example_browser.open(levels);
+            ws.editor_state.set_status("Browse levels", 2.0);
         }
         EditorAction::Exit | EditorAction::None => {}
     }

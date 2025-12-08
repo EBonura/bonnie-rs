@@ -16,11 +16,12 @@ pub enum EditorAction {
     New,
     Save,
     SaveAs,
-    Load(String), // Path to load
-    PromptLoad,   // Show file prompt
-    Export,       // Browser: download as file
-    Import,       // Browser: upload file
-    Exit,         // Close/quit
+    Load(String),   // Path to load
+    PromptLoad,     // Show file prompt
+    Export,         // Browser: download as file
+    Import,         // Browser: upload file
+    BrowseExamples, // Open example browser
+    Exit,           // Close/quit
 }
 
 /// Editor layout state (split panel ratios)
@@ -152,6 +153,11 @@ fn draw_unified_toolbar(ctx: &mut UiContext, rect: Rect, state: &mut EditorState
         if toolbar.icon_button(ctx, icon::SAVE, icon_font, "Download") {
             action = EditorAction::Export;
         }
+    }
+
+    // Level browser (works on both native and WASM)
+    if toolbar.icon_button(ctx, icon::BOOK_OPEN, icon_font, "Browse") {
+        action = EditorAction::BrowseExamples;
     }
 
     toolbar.separator();

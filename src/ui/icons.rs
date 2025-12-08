@@ -60,6 +60,9 @@ pub mod icon {
 
     // Properties panel icons
     pub const FOOTPRINTS: char = '\u{e3b9}';      // Walkable surface
+
+    // Browser / Examples
+    pub const BOOK_OPEN: char = '\u{e05f}';       // Examples browser
 }
 
 /// Draw a Lucide icon centered in a rect

@@ -216,7 +216,6 @@ impl AudioEngine {
         state.synth = Some(synth);
         state.playing = true;
 
-        println!("Loaded soundfont: {:?}", self.soundfont_name);
         Ok(())
     }
 

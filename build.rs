@@ -1,7 +1,7 @@
-//! Build script to generate texture manifest for WASM builds
+//! Build script to generate manifests for WASM builds
 //!
-//! Scans assets/textures/ and creates a manifest listing all texture packs
-//! and their files, since WASM can't enumerate directories at runtime.
+//! Scans assets/textures/ and assets/levels/ and creates manifests
+//! listing all files, since WASM can't enumerate directories at runtime.
 
 use std::fs;
 use std::io::Write;
@@ -9,7 +9,14 @@ use std::path::Path;
 
 fn main() {
     println!("cargo:rerun-if-changed=assets/textures");
+    println!("cargo:rerun-if-changed=assets/levels");
 
+    generate_texture_manifest();
+    generate_levels_manifest();
+}
+
+/// Generate manifest for texture packs
+fn generate_texture_manifest() {
     let textures_dir = Path::new("assets/textures");
     let manifest_path = Path::new("assets/textures/manifest.txt");
 
@@ -53,6 +60,40 @@ fn main() {
 
                 manifest.push('\n');
             }
+        }
+    }
+
+    // Write manifest file
+    let mut file = fs::File::create(manifest_path).unwrap();
+    file.write_all(manifest.as_bytes()).unwrap();
+}
+
+/// Generate manifest for levels (for WASM builds)
+fn generate_levels_manifest() {
+    let levels_dir = Path::new("assets/levels");
+    let manifest_path = Path::new("assets/levels/manifest.txt");
+
+    let mut manifest = String::new();
+
+    if levels_dir.exists() {
+        let mut levels: Vec<_> = fs::read_dir(levels_dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| {
+                let path = e.path();
+                // Only include .ron files, skip directories
+                path.is_file() && path
+                    .extension()
+                    .map(|ext| ext.to_ascii_lowercase() == "ron")
+                    .unwrap_or(false)
+            })
+            .collect();
+
+        levels.sort_by_key(|e| e.file_name());
+
+        for level_entry in levels {
+            let level_name = level_entry.file_name().to_string_lossy().to_string();
+            manifest.push_str(&format!("{}\n", level_name));
         }
     }
 

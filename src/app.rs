@@ -3,7 +3,7 @@
 //! Fixed set of tools, each with its own persistent state.
 //! Switch between tools via the tab bar - all tools stay alive in background.
 
-use crate::editor::{EditorState, EditorLayout};
+use crate::editor::{EditorState, EditorLayout, ExampleBrowser};
 use crate::landing::LandingState;
 use crate::modeler::{ModelerState, ModelerLayout};
 use crate::tracker::TrackerState;
@@ -55,6 +55,7 @@ impl Tool {
 pub struct WorldEditorState {
     pub editor_state: EditorState,
     pub editor_layout: EditorLayout,
+    pub example_browser: ExampleBrowser,
 }
 
 /// State for the Modeler tool
@@ -99,6 +100,7 @@ impl AppState {
             world_editor: WorldEditorState {
                 editor_state,
                 editor_layout: EditorLayout::new(),
+                example_browser: ExampleBrowser::default(),
             },
             modeler: ModelerToolState {
                 modeler_state: ModelerState::new(),

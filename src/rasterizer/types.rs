@@ -192,6 +192,56 @@ impl Texture {
     }
 
     /// Load all textures from a directory
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn load_directory<P: AsRef<std::path::Path>>(dir: P) -> Vec<Self> {
+        use indicatif::{ProgressBar, ProgressStyle};
+
+        let dir = dir.as_ref();
+        let mut textures = Vec::new();
+
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            let mut paths: Vec<_> = entries
+                .filter_map(|e| e.ok())
+                .map(|e| e.path())
+                .filter(|p| {
+                    p.extension()
+                        .map(|ext| ext.to_ascii_lowercase() == "png")
+                        .unwrap_or(false)
+                })
+                .collect();
+
+            paths.sort();
+
+            let total = paths.len() as u64;
+            let pb = ProgressBar::new(total);
+            pb.set_style(
+                ProgressStyle::default_bar()
+                    .template("Loading textures [{bar:30}] {pos}/{len} {msg}")
+                    .unwrap()
+                    .progress_chars("█▓░"),
+            );
+
+            for path in paths {
+                match Self::from_file(&path) {
+                    Ok(tex) => {
+                        pb.set_message(format!("{} ({}x{})", tex.name, tex.width, tex.height));
+                        textures.push(tex);
+                    }
+                    Err(e) => {
+                        pb.set_message(format!("Error: {}", e));
+                    }
+                }
+                pb.inc(1);
+            }
+
+            pb.finish_with_message(format!("Loaded {} textures", textures.len()));
+        }
+
+        textures
+    }
+
+    /// Load all textures from a directory (WASM - no progress bar)
+    #[cfg(target_arch = "wasm32")]
     pub fn load_directory<P: AsRef<std::path::Path>>(dir: P) -> Vec<Self> {
         let dir = dir.as_ref();
         let mut textures = Vec::new();
@@ -210,14 +260,8 @@ impl Texture {
             paths.sort();
 
             for path in paths {
-                match Self::from_file(&path) {
-                    Ok(tex) => {
-                        println!("Loaded texture: {} ({}x{})", tex.name, tex.width, tex.height);
-                        textures.push(tex);
-                    }
-                    Err(e) => {
-                        eprintln!("{}", e);
-                    }
+                if let Ok(tex) = Self::from_file(&path) {
+                    textures.push(tex);
                 }
             }
         }
