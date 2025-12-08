@@ -183,79 +183,95 @@ pub fn draw_texture_palette(
     if let Some(tex_ref) = clicked_texture {
         state.selected_texture = tex_ref.clone();
 
-        // Apply texture based on selection type
-        match state.selection.clone() {
-            // Single face selected (from 3D view) - apply to that face only
-            super::Selection::SectorFace { room, x, z, face } => {
-                state.save_undo();
-                if let Some(r) = state.level.rooms.get_mut(room) {
-                    if let Some(sector) = r.get_sector_mut(x, z) {
-                        match face {
-                            super::SectorFace::Floor => {
-                                if let Some(floor) = &mut sector.floor {
-                                    floor.texture = tex_ref;
-                                }
-                            }
-                            super::SectorFace::Ceiling => {
-                                if let Some(ceiling) = &mut sector.ceiling {
-                                    ceiling.texture = tex_ref;
-                                }
-                            }
-                            super::SectorFace::WallNorth(i) => {
-                                if let Some(wall) = sector.walls_north.get_mut(i) {
-                                    wall.texture = tex_ref;
-                                }
-                            }
-                            super::SectorFace::WallEast(i) => {
-                                if let Some(wall) = sector.walls_east.get_mut(i) {
-                                    wall.texture = tex_ref;
-                                }
-                            }
-                            super::SectorFace::WallSouth(i) => {
-                                if let Some(wall) = sector.walls_south.get_mut(i) {
-                                    wall.texture = tex_ref;
-                                }
-                            }
-                            super::SectorFace::WallWest(i) => {
-                                if let Some(wall) = sector.walls_west.get_mut(i) {
-                                    wall.texture = tex_ref;
-                                }
-                            }
-                        }
-                    }
-                }
+        // Collect all selections to apply texture to (primary + multi-selection)
+        let mut all_selections: Vec<super::Selection> = vec![state.selection.clone()];
+        all_selections.extend(state.multi_selection.clone());
+
+        // Check if we have any valid selections
+        let has_valid_selection = all_selections.iter().any(|sel| !matches!(sel, super::Selection::None));
+
+        if has_valid_selection {
+            state.save_undo();
+
+            // Apply texture to all selections
+            for sel in all_selections {
+                apply_texture_to_selection(&mut state.level, sel, tex_ref.clone());
             }
-            // Whole sector selected (from 2D view) - apply to all faces
-            super::Selection::Sector { room, x, z } => {
-                state.save_undo();
-                if let Some(r) = state.level.rooms.get_mut(room) {
-                    if let Some(sector) = r.get_sector_mut(x, z) {
-                        // Apply to floor if it exists
-                        if let Some(floor) = &mut sector.floor {
-                            floor.texture = tex_ref.clone();
-                        }
-                        // Apply to ceiling if it exists
-                        if let Some(ceiling) = &mut sector.ceiling {
-                            ceiling.texture = tex_ref.clone();
-                        }
-                        // Apply to all walls
-                        for wall in &mut sector.walls_north {
-                            wall.texture = tex_ref.clone();
-                        }
-                        for wall in &mut sector.walls_east {
-                            wall.texture = tex_ref.clone();
-                        }
-                        for wall in &mut sector.walls_south {
-                            wall.texture = tex_ref.clone();
-                        }
-                        for wall in &mut sector.walls_west {
-                            wall.texture = tex_ref.clone();
-                        }
-                    }
-                }
-            }
-            _ => {}
         }
+    }
+}
+
+/// Apply a texture to a single selection
+fn apply_texture_to_selection(level: &mut crate::world::Level, selection: super::Selection, tex_ref: crate::world::TextureRef) {
+    match selection {
+        // Single face selected (from 3D view) - apply to that face only
+        super::Selection::SectorFace { room, x, z, face } => {
+            if let Some(r) = level.rooms.get_mut(room) {
+                if let Some(sector) = r.get_sector_mut(x, z) {
+                    match face {
+                        super::SectorFace::Floor => {
+                            if let Some(floor) = &mut sector.floor {
+                                floor.texture = tex_ref;
+                            }
+                        }
+                        super::SectorFace::Ceiling => {
+                            if let Some(ceiling) = &mut sector.ceiling {
+                                ceiling.texture = tex_ref;
+                            }
+                        }
+                        super::SectorFace::WallNorth(i) => {
+                            if let Some(wall) = sector.walls_north.get_mut(i) {
+                                wall.texture = tex_ref;
+                            }
+                        }
+                        super::SectorFace::WallEast(i) => {
+                            if let Some(wall) = sector.walls_east.get_mut(i) {
+                                wall.texture = tex_ref;
+                            }
+                        }
+                        super::SectorFace::WallSouth(i) => {
+                            if let Some(wall) = sector.walls_south.get_mut(i) {
+                                wall.texture = tex_ref;
+                            }
+                        }
+                        super::SectorFace::WallWest(i) => {
+                            if let Some(wall) = sector.walls_west.get_mut(i) {
+                                wall.texture = tex_ref;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // Whole sector selected (from 2D view) - apply to all faces
+        super::Selection::Sector { room, x, z } => {
+            if let Some(r) = level.rooms.get_mut(room) {
+                if let Some(sector) = r.get_sector_mut(x, z) {
+                    // Apply to floor if it exists
+                    if let Some(floor) = &mut sector.floor {
+                        floor.texture = tex_ref.clone();
+                    }
+                    // Apply to ceiling if it exists
+                    if let Some(ceiling) = &mut sector.ceiling {
+                        ceiling.texture = tex_ref.clone();
+                    }
+                    // Apply to all walls
+                    for wall in &mut sector.walls_north {
+                        wall.texture = tex_ref.clone();
+                    }
+                    for wall in &mut sector.walls_east {
+                        wall.texture = tex_ref.clone();
+                    }
+                    for wall in &mut sector.walls_south {
+                        wall.texture = tex_ref.clone();
+                    }
+                    for wall in &mut sector.walls_west {
+                        wall.texture = tex_ref.clone();
+                    }
+                }
+            }
+        }
+        _ => {}
     }
 }
 
