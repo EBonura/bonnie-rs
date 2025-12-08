@@ -101,6 +101,13 @@ async fn main() {
         last_left_down = left_down;
         ui_ctx.begin_frame(mouse_state);
 
+        // Block background input if example browser modal is open
+        // Save the real mouse state so we can restore it for the modal
+        let real_mouse = mouse_state;
+        if app.world_editor.example_browser.open {
+            ui_ctx.begin_modal();
+        }
+
         let screen_w = screen_width();
         let screen_h = screen_height();
 
@@ -205,6 +212,9 @@ async fn main() {
 
                 // Draw example browser overlay if open
                 if ws.example_browser.open {
+                    // End modal blocking so the browser itself can receive input
+                    ui_ctx.end_modal(real_mouse);
+
                     let browser_action = draw_example_browser(
                         &mut ui_ctx,
                         &mut ws.example_browser,

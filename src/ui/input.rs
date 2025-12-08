@@ -51,6 +51,8 @@ pub struct UiContext {
     id_counter: u64,
     /// Tooltip to show this frame (set by widgets, drawn at end)
     pub tooltip: Option<PendingTooltip>,
+    /// Whether a modal dialog is active (blocks input to background)
+    modal_active: bool,
 }
 
 impl UiContext {
@@ -61,7 +63,34 @@ impl UiContext {
             hot: None,
             id_counter: 0,
             tooltip: None,
+            modal_active: false,
         }
+    }
+
+    /// Check if a modal is currently blocking input
+    pub fn is_modal_active(&self) -> bool {
+        self.modal_active
+    }
+
+    /// Begin a modal section - blocks input to everything drawn after this
+    /// Saves the real mouse state and replaces it with a "dead" state
+    pub fn begin_modal(&mut self) {
+        if !self.modal_active {
+            self.modal_active = true;
+            // Block all mouse interactions
+            self.mouse.left_down = false;
+            self.mouse.right_down = false;
+            self.mouse.left_pressed = false;
+            self.mouse.left_released = false;
+            self.mouse.scroll = 0.0;
+        }
+    }
+
+    /// End modal section - restores mouse input for modal widgets
+    /// Call this before drawing modal content so it can receive input
+    pub fn end_modal(&mut self, real_mouse: MouseState) {
+        self.modal_active = false;
+        self.mouse = real_mouse;
     }
 
     /// Generate a unique ID for a widget
@@ -76,6 +105,7 @@ impl UiContext {
         self.hot = None;
         self.id_counter = 0;
         self.tooltip = None;
+        self.modal_active = false;
 
         // Clear dragging if mouse released
         if !self.mouse.left_down {
