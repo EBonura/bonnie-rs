@@ -75,13 +75,19 @@ async fn main() {
     // Track if this is the first time opening World Editor (to show browser)
     let mut world_editor_first_open = true;
 
-    // Load textures from manifest (WASM needs async loading)
+    // Load textures and level list from manifest (WASM needs async loading)
     #[cfg(target_arch = "wasm32")]
-    {
+    let preloaded_levels = {
         use editor::TexturePack;
+        use editor::load_example_list;
         app.world_editor.editor_state.texture_packs = TexturePack::load_from_manifest().await;
         println!("WASM: Loaded {} texture packs", app.world_editor.editor_state.texture_packs.len());
-    }
+        let levels = load_example_list().await;
+        println!("WASM: Loaded {} example levels from manifest", levels.len());
+        levels
+    };
+    #[cfg(not(target_arch = "wasm32"))]
+    let preloaded_levels = discover_examples();
 
     println!("=== Bonnie Engine ===");
 
@@ -127,8 +133,7 @@ async fn main() {
                 // Open browser on first World Editor visit
                 if tool == Tool::WorldEditor && world_editor_first_open {
                     world_editor_first_open = false;
-                    let levels = discover_examples();
-                    app.world_editor.example_browser.open(levels);
+                    app.world_editor.example_browser.open(preloaded_levels.clone());
                 }
                 app.set_active_tool(tool);
             }
@@ -208,7 +213,7 @@ async fn main() {
                 );
 
                 // Handle editor actions (including opening example browser)
-                handle_editor_action(action, ws);
+                handle_editor_action(action, ws, &preloaded_levels);
 
                 // Draw example browser overlay if open
                 if ws.example_browser.open {
@@ -308,7 +313,7 @@ async fn main() {
 }
 
 
-fn handle_editor_action(action: EditorAction, ws: &mut app::WorldEditorState) {
+fn handle_editor_action(action: EditorAction, ws: &mut app::WorldEditorState, preloaded_levels: &[editor::ExampleLevelInfo]) {
     match action {
         EditorAction::Play => {
             ws.editor_state.set_status("Game preview coming soon", 2.0);
@@ -467,8 +472,7 @@ fn handle_editor_action(action: EditorAction, ws: &mut app::WorldEditorState) {
         }
         EditorAction::BrowseExamples => {
             // Open the level browser
-            let levels = discover_examples();
-            ws.example_browser.open(levels);
+            ws.example_browser.open(preloaded_levels.to_vec());
             ws.editor_state.set_status("Browse levels", 2.0);
         }
         EditorAction::Exit | EditorAction::None => {}
