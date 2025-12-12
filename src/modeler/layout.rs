@@ -205,6 +205,7 @@ fn draw_toolbar(ctx: &mut UiContext, rect: Rect, state: &mut ModelerState, icon_
         for mode in SelectMode::ALL {
             let is_active = state.select_mode == mode;
             let icon_char = match mode {
+                SelectMode::Bone => icon::BONE,
                 SelectMode::Part => icon::BOX,
                 SelectMode::Vertex => icon::CIRCLE_DOT,
                 SelectMode::Edge => icon::MINUS,
@@ -402,6 +403,9 @@ fn draw_properties_panel(_ctx: &mut UiContext, rect: Rect, state: &ModelerState)
     match &state.selection {
         super::state::ModelerSelection::None => {
             draw_text("Nothing selected", rect.x, y + 14.0, 12.0, TEXT_COLOR);
+        }
+        super::state::ModelerSelection::Bones(bones) => {
+            draw_text(&format!("{} bone(s)", bones.len()), rect.x, y + 14.0, 12.0, TEXT_COLOR);
         }
         super::state::ModelerSelection::Parts(parts) => {
             draw_text(&format!("{} part(s)", parts.len()), rect.x, y + 14.0, 12.0, TEXT_COLOR);

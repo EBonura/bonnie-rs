@@ -45,6 +45,7 @@ impl ModelerView {
 /// Selection modes for modeling
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SelectMode {
+    Bone,
     Part,
     Vertex,
     Edge,
@@ -52,7 +53,8 @@ pub enum SelectMode {
 }
 
 impl SelectMode {
-    pub const ALL: [SelectMode; 4] = [
+    pub const ALL: [SelectMode; 5] = [
+        SelectMode::Bone,
         SelectMode::Part,
         SelectMode::Vertex,
         SelectMode::Edge,
@@ -61,6 +63,7 @@ impl SelectMode {
 
     pub fn label(&self) -> &'static str {
         match self {
+            SelectMode::Bone => "Bone",
             SelectMode::Part => "Part",
             SelectMode::Vertex => "Vertex",
             SelectMode::Edge => "Edge",
@@ -77,6 +80,7 @@ impl SelectMode {
 #[derive(Debug, Clone)]
 pub enum ModelerSelection {
     None,
+    Bones(Vec<usize>),
     Parts(Vec<usize>),
     Vertices { part: usize, verts: Vec<usize> },
     Edges { part: usize, edges: Vec<(usize, usize)> },
@@ -87,6 +91,7 @@ impl ModelerSelection {
     pub fn is_empty(&self) -> bool {
         match self {
             ModelerSelection::None => true,
+            ModelerSelection::Bones(v) => v.is_empty(),
             ModelerSelection::Parts(v) => v.is_empty(),
             ModelerSelection::Vertices { verts, .. } => verts.is_empty(),
             ModelerSelection::Edges { edges, .. } => edges.is_empty(),
@@ -223,11 +228,11 @@ impl ModelerState {
         Self::update_camera_from_orbit(&mut camera, orbit_target, orbit_distance, orbit_azimuth, orbit_elevation);
 
         Self {
-            model: Model::test_cube(),
+            model: Model::test_humanoid(),
             current_file: None,
 
             view: ModelerView::Model,
-            select_mode: SelectMode::Part,
+            select_mode: SelectMode::Bone,
             tool: TransformTool::Select,
             selection: ModelerSelection::None,
 

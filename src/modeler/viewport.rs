@@ -100,6 +100,36 @@ fn identity_matrix() -> [[f32; 4]; 4] {
     ]
 }
 
+/// Build a combined transform matrix from position and rotation
+fn build_transform_matrix(position: Vec3, rotation: Vec3) -> [[f32; 4]; 4] {
+    let rot_mat = rotation_matrix(rotation);
+    let trans_mat = translation_matrix(position);
+    mat_mul(&trans_mat, &rot_mat)
+}
+
+/// Compute world matrices for all bones in the skeleton hierarchy
+fn compute_bone_world_transforms(model: &Model) -> Vec<[[f32; 4]; 4]> {
+    let mut matrices = vec![identity_matrix(); model.bones.len()];
+
+    for (i, bone) in model.bones.iter().enumerate() {
+        let local = build_transform_matrix(bone.local_position, bone.local_rotation);
+
+        let world = if let Some(parent_idx) = bone.parent {
+            if parent_idx < i {
+                mat_mul(&matrices[parent_idx], &local)
+            } else {
+                local
+            }
+        } else {
+            local
+        };
+
+        matrices[i] = world;
+    }
+
+    matrices
+}
+
 /// Compute world matrices for all parts given animation pose
 fn compute_world_matrices(model: &Model, pose: &[PartTransform]) -> Vec<[[f32; 4]; 4]> {
     let mut matrices = Vec::with_capacity(model.parts.len());
@@ -266,6 +296,16 @@ pub fn draw_modeler_viewport(
     let empty_textures: Vec<crate::rasterizer::Texture> = Vec::new();
     render_mesh(fb, &all_vertices, &all_faces, &empty_textures, &state.camera, &state.raster_settings);
 
+    // Draw bones (skeleton visualization)
+    if !state.model.bones.is_empty() {
+        let bone_transforms = compute_bone_world_transforms(&state.model);
+        let selected_bones = match &state.selection {
+            ModelerSelection::Bones(bones) => bones.as_slice(),
+            _ => &[],
+        };
+        draw_bones(fb, &state.model, &state.camera, &bone_transforms, selected_bones);
+    }
+
     // Draw part/vertex/edge/face overlays based on selection mode
     draw_selection_overlays(ctx, fb, state, &world_matrices, screen_to_fb);
 
@@ -305,6 +345,62 @@ pub fn draw_modeler_viewport(
         12.0,
         Color::from_rgba(180, 180, 180, 255),
     );
+}
+
+/// Draw the skeleton bones
+fn draw_bones(
+    fb: &mut Framebuffer,
+    model: &Model,
+    camera: &crate::rasterizer::Camera,
+    bone_transforms: &[[[f32; 4]; 4]],
+    selected_bones: &[usize],
+) {
+    let bone_color = RasterColor::new(220, 200, 50); // Yellow
+    let selected_color = RasterColor::new(50, 255, 100); // Bright green
+    let joint_color = RasterColor::new(255, 150, 50); // Orange
+
+    for (bone_idx, bone) in model.bones.iter().enumerate() {
+        let world_mat = &bone_transforms[bone_idx];
+
+        // Joint position (origin of bone in world space)
+        let joint_pos = Vec3::new(world_mat[0][3], world_mat[1][3], world_mat[2][3]);
+
+        // Bone tip position (extends along local Y axis by bone length)
+        let tip_local = Vec3::new(0.0, bone.length, 0.0);
+        let tip_pos = transform_point(world_mat, tip_local);
+
+        // Choose color based on selection
+        let color = if selected_bones.contains(&bone_idx) {
+            selected_color
+        } else {
+            bone_color
+        };
+
+        // Draw bone line from joint to tip
+        draw_3d_line(fb, joint_pos, tip_pos, camera, color);
+
+        // Draw joint marker (small cross)
+        if let Some((sx, sy)) = world_to_screen(
+            joint_pos,
+            camera.position,
+            camera.basis_x,
+            camera.basis_y,
+            camera.basis_z,
+            fb.width,
+            fb.height,
+        ) {
+            let marker_color = if selected_bones.contains(&bone_idx) {
+                selected_color
+            } else {
+                joint_color
+            };
+            let size = if selected_bones.contains(&bone_idx) { 5 } else { 3 };
+            let sx = sx as i32;
+            let sy = sy as i32;
+            fb.draw_line(sx - size, sy, sx + size, sy, marker_color);
+            fb.draw_line(sx, sy - size, sx, sy + size, marker_color);
+        }
+    }
 }
 
 /// Draw floor grid
@@ -507,6 +603,41 @@ fn handle_selection_click<F>(
     };
 
     match state.select_mode {
+        SelectMode::Bone => {
+            // Find closest bone (check joint positions)
+            let bone_transforms = compute_bone_world_transforms(&state.model);
+            let mut closest: Option<(usize, f32)> = None;
+
+            for (bone_idx, _bone) in state.model.bones.iter().enumerate() {
+                let world_mat = &bone_transforms[bone_idx];
+                let joint_pos = Vec3::new(world_mat[0][3], world_mat[1][3], world_mat[2][3]);
+
+                if let Some((sx, sy)) = world_to_screen(
+                    joint_pos,
+                    state.camera.position,
+                    state.camera.basis_x,
+                    state.camera.basis_y,
+                    state.camera.basis_z,
+                    fb_width,
+                    fb_height,
+                ) {
+                    let dist = ((fb_x - sx).powi(2) + (fb_y - sy).powi(2)).sqrt();
+                    if dist < 15.0 {
+                        if closest.map_or(true, |(_, best_dist)| dist < best_dist) {
+                            closest = Some((bone_idx, dist));
+                        }
+                    }
+                }
+            }
+
+            if let Some((bone_idx, _)) = closest {
+                state.selection = ModelerSelection::Bones(vec![bone_idx]);
+                state.set_status(&format!("Selected bone: {}", state.model.bones[bone_idx].name), 1.5);
+            } else {
+                state.selection = ModelerSelection::None;
+            }
+        }
+
         SelectMode::Part => {
             // Find closest part (check all vertices, pick part with closest vertex)
             let mut closest: Option<(usize, f32)> = None;
